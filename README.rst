@@ -12,6 +12,13 @@ Any crate using types from this crate should re‐export them. For example, the
 ``httpc`` so that people can write ``httpc::status`` instead of
 ``httpcommon::status``.
 
+Author
+------
+
+`Chris Morgan <http://chrismorgan.info>`_ (`chris-morgan
+<https://github.com/chris-morgan>`_) is the primary author and maintainer of
+this crate.
+
 License
 -------
 
