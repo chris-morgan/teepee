@@ -1,0 +1,7 @@
+build/
+TAGS
+doc/httpcommon/
+doc/src/httpcommon/
+doc/.lock
+doc/*.js
+doc/*.css
