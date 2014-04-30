@@ -1,7 +1,11 @@
 build/
 TAGS
 doc/httpcommon/
+doc/httpc/
+doc/httpd/
 doc/src/httpcommon/
+doc/src/httpc/
+doc/src/httpd/
 doc/.lock
 doc/*.js
 doc/*.css

@@ -4,7 +4,9 @@ RUSTFLAGS ?= -O
 RUST_REPOSITORY ?= ../../rust
 RUST_CTAGS ?= $(RUST_REPOSITORY)/src/etc/ctags.rust
 
-CRATES=httpcommon
+CRATES=httpcommon httpc httpd
+DEP_httpc=httpcommon
+DEP_httpd=httpcommon
 
 all: $(CRATES) docs
 
