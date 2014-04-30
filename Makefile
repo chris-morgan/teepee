@@ -26,18 +26,18 @@ $(1): $$(LIB_$(1))
 
 $$(LIB_$(1)): $$(SRC_$(1)) $$(DEP_$(1))
 	@mkdir -p build/
-	$$(RUSTC) $$(RUSTFLAGS) src/$(1)/lib.rs --out-dir=build
+	$$(RUSTC) $$(RUSTFLAGS) src/$(1)/lib.rs --out-dir=build -L build
 
 $(1)-docs: doc/$(1)/index.html
 
-doc/$(1)/index.html: $$(SRC_$(1))
-	$$(RUSTDOC) src/$(1)/lib.rs
+doc/$(1)/index.html: $$(SRC_$(1)) $$(DEP_$(1))
+	$$(RUSTDOC) src/$(1)/lib.rs -L build
 
-build/$(1)-test: $$(SRC_$(1))
-	$$(RUSTC) $$(RUSTFLAGS) --test -o build/$(1)-test src/$(1)/lib.rs
+build/$(1)-test: $$(SRC_$(1)) $$(DEP_$(1))
+	$$(RUSTC) $$(RUSTFLAGS) --test -o build/$(1)-test src/$(1)/lib.rs -L build
 
-build/$(1)-quicktest: $$(SRC_$(1))
-	$$(RUSTC) --test -o build/$(1)-quicktest src/$(1)/lib.rs
+build/$(1)-quicktest: $$(SRC_$(1)) $$(DEP_$(1))
+	$$(RUSTC) --test -o build/$(1)-quicktest src/$(1)/lib.rs -L build
 
 $(1)-test: $(1) build/$(1)-test
 	build/$(1)-test --test
