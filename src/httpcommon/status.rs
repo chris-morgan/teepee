@@ -6,7 +6,7 @@ use std::fmt;
 ///
 /// This enum is absolutely exhaustive, covering all 500 possible values (100–599).
 ///
-/// For HTTP/2.0, statuses belonging to the 1xx Informational are invalid.
+/// For HTTP/2.0, statuses belonging to the 1xx Informational class are invalid.
 ///
 /// As this is a C‐style enum with each variant having a corresponding value, you may use the likes
 /// of `Continue as u16` to retreive the value `100u16`. Normally, though, you should not need to do
