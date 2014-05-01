@@ -6,7 +6,8 @@
 #![crate_type = "dylib"]
 #![crate_type = "rlib"]
 
-#![doc(html_root_url = "http://www.rust-ci.org/teepee/teepee/doc/")]
+#![doc(html_logo_url = "http://teepee.rs/logo.100.png",
+       html_root_url = "http://www.rust-ci.org/teepee/teepee/doc/")]
 
 #![deny(unnecessary_qualification)]
 #![deny(non_uppercase_statics)]
