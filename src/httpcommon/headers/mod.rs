@@ -6,9 +6,13 @@ use std::intrinsics::TypeId;
 use std::fmt;
 use std::io::MemWriter;
 use std::raw::TraitObject;
-use std::str::{IntoMaybeOwned, SendStr};
+use std::str::SendStr;
 
 use collections::hashmap::HashMap;
+
+use self::internals::Item;
+
+mod internals;
 
 /// The data type of an HTTP header for encoding and decoding.
 pub trait Header: Any {
@@ -19,14 +23,14 @@ pub trait Header: Any {
     /// slice contains other than one value), but some may accept multiple header field values; in
     /// such cases, they MUST be equivalent to having them all as a comma-separated single field
     /// (RFC 2616), with exceptions for things like dropping invalid values.
-    fn parse_header(s: &[Vec<u8>]) -> Option<Self>;
+    fn parse_header(raw_field_values: &[Vec<u8>]) -> Option<Self>;
 
     /// Introducing an `Err` value that does *not* come from the writer is incorrect behaviour and
     /// may lead to task failure in certain situations. (The primary case where this will happen is
     /// accessing a cached Box<Header> object as a different type; then, it is shoved into a buffer
     /// through fmt_header and then back into the new type through parse_header. Should the
     /// fmt_header call have return an Err, it will fail.
-    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result;
+    fn fmt_header(&self, writer: &mut Writer) -> fmt::Result;
 }
 
 // impl copied from std::any. Not especially nice, sorry :-(
@@ -140,8 +144,8 @@ impl Header for Box<Header> {
         None
     }
 
-    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.fmt_header(f)
+    fn fmt_header(&self, w: &mut Writer) -> fmt::Result {
+        self.fmt_header(w)
     }
 }
 
@@ -151,24 +155,109 @@ impl<'a> Header for &'a Header {
         None
     }
 
-    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.fmt_header(f)
+    fn fmt_header(&self, w: &mut Writer) -> fmt::Result {
+        self.fmt_header(w)
     }
 }
 
-/// All the header field values, raw or typed, with a shared field name.
-enum Item {
-    /// A raw, unparsed header. Each item in the outer vector is a header field value, the names of
-    /// which were equivalent. Each inner vector is a string in the ISO-8859-1 character set, but
-    /// could contain things in other character sets according to the rules of RFC 2047, e.g. in a
-    /// *TEXT rule (RFC 2616 grammar).
-    Raw(Vec<Vec<u8>>),
-
-    /// A strongly typed header which has been parsed from the raw value.
-    Typed(Box<Header>:'static),
-}
-
 /// A collection of HTTP headers.
+///
+/// Usage
+/// -----
+///
+/// The primary methods you will care about are:
+///
+/// Typed header access
+/// ```````````````````
+///
+/// Unlike most HTTP libraries, this one cares about correctness and strong typing; headers are
+/// semantically typed values, not just sequences of characters. This may lead to some surprises for
+/// people used to other environments. For example, you might think that the `Connection` header is
+/// a scalar, having seen it with the value `close` most frequently when present; therefore you
+/// might expect to check `*request.headers.get_ref(CONNECTION) == Close`. Well, it's not: it's
+/// actually a linear value, `Vec<Connection>` instead of `Connection`, so you'll actually be
+/// wanting to check something more like `request.headers.get_ref(CONNECTION).map(|c|
+/// c.contains(&Close)) == Some(true)`. Yes, this is more cumbersome than what you might write in
+/// another language, such as `request.headers["Connection"] == "close"`, but it's actually correct,
+/// whereas the one people would often write is very definitely incorrect.
+///
+/// There are four methods for this:
+///
+/// - `get`: cloned value, if it exists.
+/// - `get_ref`: reference to the value, if it exists.
+/// - `get_mut_ref`: mutable reference to the value, if it exists.
+/// - `set`: assign the value.
+///
+/// One thing out of the ordinary to be aware of is that all of these methods take `&mut self`, even
+/// `get` and `get_ref`; this is not ideal, but it is thus for a very good reason, an outcome of the
+/// hybrid typed/raw approach employed. The main practial effect of this is that you cannot take
+/// references to more than one header at once; where possible, use `get_ref`, but it is
+/// acknowledged that it will not always be feasible to use it: this is why `get` exists, which
+/// clones the value, thus releasing the lock on the header collection.
+///
+/// Raw header access
+/// `````````````````
+///
+/// Largely you should prefer typed access, but sometimes raw header access is convenient or even
+/// necessary.
+///
+/// There are again four methods for this, corresponding to the typed techniques:
+///
+/// - `get_raw`: cloned value, if it exists.
+/// - `get_raw_ref`: reference to the value, if it exists.
+/// - `get_raw_mut_ref`: mutable reference to the value, if it exists.
+/// - `set_raw`: assign the value.
+///
+/// Aside: what is a header?
+/// ------------------------
+///
+/// When we speak of a header in this library, we are not referring to the HTTP concept of a *header
+/// field*; we are dealing with a slightly higher abstraction than that.
+///
+/// In HTTP/1.1, a message header is defined like this (RFC 2616, section 4.2 Message Headers):
+///
+///         message-header = field-name ":" [ field-value ]
+///         field-name     = token
+///         field-value    = *( field-content | LWS )
+///         field-content  = <the OCTETs making up the field-value
+///                          and consisting of either *TEXT or combinations
+///                          of token, separators, and quoted-string>
+///
+/// This is something all web developers should be at least basically familiar with.
+///
+/// The interesting part comes a little later in that section and is to do with how message headers
+/// *combine*:
+///
+///     Multiple message-header fields with the same field-name MAY be
+///     present in a message if and only if the entire field-value for that
+///     header field is defined as a comma-separated list [i.e., #(values)].
+///     It MUST be possible to combine the multiple header fields into one
+///     "field-name: field-value" pair, without changing the semantics of the
+///     message, by appending each subsequent field-value to the first, each
+///     separated by a comma. The order in which header fields with the same
+///     field-name are received is therefore significant to the
+///     interpretation of the combined field value, and thus a proxy MUST NOT
+///     change the order of these field values when a message is forwarded.
+///
+/// In this library, what we call a header is not a single message header, but rather the
+/// combination of all message headers with the same field name; that is, a field-name plus *all*
+/// related field-values. One can still access them separately through the raw interface, but the
+/// preferred technique is accessing them through the typed interface, where all such
+/// identically-named message headers will be merged.
+///
+/// Representation
+/// --------------
+///
+/// A knowledge of how headers are represented internally may assist you in using them efficiently.
+///
+/// Headers are stored in a hash map; the keys are header names and the values are what for the
+/// purpose of this description will be dubbed *items*.
+///
+/// At this point it is worth recalling that in a request or response, there can be multiple header
+/// fields with the same name; this is why the raw representation of each header item is `Vec<Vec<u8>>`
+/// rather than `Vec<u8>` each header field can 
+/// Each header name is thus associated with an
+/// item.
 pub struct Headers {
     data: HashMap<SendStr, Item>,
 }
@@ -183,59 +272,12 @@ impl Headers {
 }
 
 impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
-    fn mostly_get<'a>(&'a mut self, header_marker: &M) -> Option<&'a mut Item> {
-        let name = header_marker.header_name();
-        let item = match self.data.find_mut(&name) {
-            // Yes, there's a header… or something… by that name
-            Some(v) => v,
-            // Header? There is no header!
-            None => return None,
-        };
-
-        let (insert_parsed, parsed): (bool, Option<H>) = match *item {
-            // We've parsed this header before, as some type or other.
-            // Question is: is it the right type?
-
-            // Yes, it's the right type, so we can immediately return it.
-            // Well, we could, except that that makes the borrow checker keep the item borrow alive,
-            // preventing the insert in the other cases. So we must refactor it to return at the
-            // end instead.
-            Typed(ref h) if h.is::<H>() => {
-                (false, None)
-            },
-
-            // No, it was parsed as a different type.
-            // Very well then, we will turn it back into a string first.
-            Typed(ref h) => {
-                let raw = fmt_header(h);
-                (true, Header::parse_header([raw]))
-            },
-
-            // We haven't parsed it before, so let's have a go at that.
-            Raw(ref raw) => (true, Header::parse_header(raw.as_slice())),
-        };
-
-        if insert_parsed {
-            match parsed {
-                // It parsed. Let's store the new value (replacing the raw one)
-                Some(v) => *item = Typed(box v),
-                // If the header doesn't parse, that's the same as it being absent.
-                None => return None,
-            }
-        }
-        Some(item)
-    }
 
     /// Retrieve a header value. The value is a clone of the one that is stored internally.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
     pub fn get(&mut self, header_marker: M) -> Option<H> {
-        // At this point, we know that item is None, or Some(&mut Typed(h)) and that h.is::<H>().
-        // On that basis, we can use as_ref_unchecked instead of as_ref, to save a virtual call.
-        match self.mostly_get(&header_marker) {
-            Some(&Typed(ref h)) => Some(unsafe { h.as_ref_unchecked::<H>() }.clone()),
-            _ => None,
-        }
+        self.get_ref(header_marker).map(|h: &H| h.clone())
     }
 
     /// Get a reference to a header value.
@@ -247,77 +289,75 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
     pub fn get_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a H> {
-        match self.mostly_get(&header_marker) {
-            Some(&Typed(ref h)) => Some(unsafe { h.as_ref_unchecked::<H>() }),
-            _ => None,
-        }
+        let name = header_marker.header_name();
+        self.data.find_mut(&name).and_then(|item| item.typed_ref())
     }
 
     /// Get a mutable reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
     pub fn get_mut_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a mut H> {
-        match self.mostly_get(&header_marker) {
-            Some(&Typed(ref mut h)) => Some(unsafe { h.as_mut_unchecked::<H>() }),
-            _ => None,
-        }
+        let name = header_marker.header_name();
+        self.data.find_mut(&name).and_then(|item| item.typed_mut_ref())
     }
 
     /// Set the named header to the given value.
     pub fn set(&mut self, header_marker: M, value: H) {
-        self.data.insert(header_marker.header_name(), Typed(box value));
+        let name = header_marker.header_name();
+        // XXX: for efficiency, I want something like find_or_insert_with and insert_or_update_with,
+        // except with callbacks for *both* cases, insert and update. At present HashMap does not
+        // provide this. TODO(Chris): implement this upstream.
+        if self.data.contains_key(&name) {
+            self.data.find_mut(&name).unwrap().set_typed(value);
+        } else {
+            self.data.insert(name, Item::from_typed(value));
+        }
+    }
+
+    /// Get the raw values of a header, by name.
+    ///
+    /// The returned value is a slice of each header field value.
+    #[inline]
+    pub fn get_raw(&mut self, header_marker: M) -> Option<Vec<Vec<u8>>> {
+        self.get_raw_ref(header_marker).map(|h| h.iter().map(|v| v.clone()).collect())
+    }
+
+    /// Get the raw values of a header, by name.
+    ///
+    /// The returned value is a slice of each header field value.
+    #[inline]
+    pub fn get_raw_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a [Vec<u8>]> {
+        self.data.find_mut(&header_marker.header_name()).map(|item| item.raw_ref().as_slice())
+    }
+
+    /// Get a mutable reference to the raw values of a header, by name.
+    ///
+    /// The returned vector contains each header field value.
+    #[inline]
+    pub fn get_raw_mut_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a mut Vec<Vec<u8>>> {
+        self.data.find_mut(&header_marker.header_name()).map(|item| item.raw_mut_ref())
+    }
+
+    /// Set the raw value of a header, by name.
+    ///
+    /// This invalidates the typed representation.
+    #[inline]
+    pub fn set_raw(&mut self, header_marker: M, value: Vec<Vec<u8>>) {
+        let name = header_marker.header_name();
+        // XXX: for efficiency, I want something like find_or_insert_with and insert_or_update_with,
+        // except with callbacks for *both* cases, insert and update. At present HashMap does not
+        // provide this. TODO(Chris): implement this upstream.
+        if self.data.contains_key(&name) {
+            self.data.find_mut(&name).unwrap().set_raw(value);
+        } else {
+            self.data.insert(name, Item::from_raw(value));
+        }
     }
 
     /// Remove a header from the collection.
     /// Returns true if the named header was present.
     pub fn remove(&mut self, header_marker: &M) {
         self.data.remove(&header_marker.header_name());
-    }
-}
-
-impl Headers {
-    fn mostly_get_raw<'a>(&'a mut self, name: SendStr) -> Option<&'a mut Item> {
-        let item = match self.data.find_mut(&name) {
-            // Yes, there's a header… or something… by that name
-            Some(v) => v,
-            // Header? There is no header!
-            None => return None,
-        };
-
-        let insert_raw = match *item {
-            Typed(ref h) => Some(Raw(vec!(fmt_header(h)))),
-
-            // We haven't parsed it before, so let's have a go at that.
-            Raw(_) => None,
-        };
-
-        match insert_raw {
-            Some(raw) => *item = raw,
-            None => (),
-        }
-
-        Some(item)
-    }
-
-    /// Get the raw values of a header, by name.
-    ///
-    /// The returned value is a slice of each header field value.
-    pub fn get_raw<'a, S: IntoMaybeOwned<'static>>(&'a mut self, name: S) -> Option<&'a [Vec<u8>]> {
-        match self.mostly_get_raw(name.into_maybe_owned()) {
-            Some(&Raw(ref raw)) => Some(raw.as_slice()),
-            _ => None,
-        }
-    }
-
-    /// Get a mutable reference to the raw values of a header, by name.
-    ///
-    /// The returned vector contains each header field value.
-    pub fn get_raw_mut<'a, S: IntoMaybeOwned<'static>>(&'a mut self, name: S)
-                                                      -> Option<&'a mut Vec<Vec<u8>>> {
-        match self.mostly_get_raw(name.into_maybe_owned()) {
-            Some(&Raw(ref mut raw)) => Some(raw),
-            _ => None,
-        }
     }
 }
 
@@ -329,26 +369,19 @@ impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let HeaderShowAdapter(h) = *self;
-        h.fmt_header(f)
+        h.fmt_header(f.buf)
     }
 }
 
 #[inline]
 /// Convert a typed header into the raw HTTP header field value.
 pub fn fmt_header<H: Header>(h: &H) -> Vec<u8> {
-    format_args!(format_but_not_utf8, "{}", HeaderShowAdapter(h))
-}
-
-// Parallel to ::std::fmt::{format, format_unsafe}, but returning Vec<u8> rather than Box<str>.
-#[inline]
-#[doc(hidden)]
-pub fn format_but_not_utf8(args: &fmt::Arguments) -> Vec<u8> {
     let mut output = MemWriter::new();
-    fmt::write(&mut output as &mut Writer, args).unwrap();
+    h.fmt_header(&mut output).unwrap();
     output.unwrap()
 }
 
-#[cfg(test)]
+#[cfg(test_broken)]
 mod tests {
     use super::*;
 
@@ -365,9 +398,9 @@ mod tests {
         assert_eq!(headers.get(EXPIRES), None);
 
         headers.set(EXPIRES, Past);
-        assert_eq!(headers.mostly_get(&EXPIRES), &mut Typed(Box<Past>));
+        assert_eq!(headers.mostly_get(&EXPIRES), &mut Typed(box Past));
         expect(headers.get(EXPIRES), Past, bytes!("0"));
-        assert_eq!(headers.get_raw("expires"), vec!(vec!('0' as u8)));
+        assert_eq!(headers.get_raw("expires"), vec![vec!['0' as u8]]);
         expect(headers.get(EXPIRES), Past, bytes!("0"));
 
         headers.remove(&EXPIRES);
