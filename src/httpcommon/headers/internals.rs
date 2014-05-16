@@ -6,6 +6,16 @@ use super::{Header, UncheckedAnyMutRefExt, fmt_header};
 
 /// All the header field values, raw or typed, with a shared field name.
 ///
+/// Each item contains a raw and/or a typed representation (but not neither!); for safety, taking a
+/// mutable reference to either invalidates the other; immutable references to not cause
+/// invalidation and so should be preferred where possible.
+///
+/// If a typed representation is invalidated, it is immediately dropped and replaced with `None`; if
+/// a raw representation is invalidated, it is *not* dropped, but rather marked as invalid: this is
+/// so that the outer vector can be reused, reducing allocation churn slightly. Trivial performance
+/// improvement, though it also increases memory usage in the mean time. That is expected to be a
+/// very small amount (<1KB across all headers) in most cases and acceptable.
+///
 /// Invariants beyond those enforced by the type system:
 ///
 /// - `raw == None` requires `!raw_valid`.
@@ -191,34 +201,41 @@ impl Item {
         self.raw_valid = false;
         self.typed = Some(box value as Box<Header>);
     }
-
-    #[cfg(test)]
-    fn assert_invariants(&self) {
-        assert!(self.raw.is_some() || !self.raw_valid);
-        assert!(self.raw.is_some() || self.typed.is_some());
-        assert!(!self.raw_valid || self.raw.get_ref().len() > 0);
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::Item;
     use super::super::Header;
     use std::fmt;
     use std::any::AnyRefExt;
 
+    // Until https://github.com/mozilla/rust/issues/9052 is fixed, the super:: is needed.
+    #[allow(unnecessary_qualification)]
+    impl super::Item {
+        fn assert_invariants(&self) {
+            assert!(self.raw.is_some() || !self.raw_valid);
+            assert!(self.raw.is_some() || self.typed.is_some());
+            assert!(!self.raw_valid || self.raw.get_ref().len() > 0);
+        }
+    }
+
     fn mkitem<H: Header + 'static>(raw_valid: bool,
                                    raw: Option<Vec<Vec<u8>>>,
                                    typed: Option<H>) -> Item {
-        Item {
+        let item = Item {
             raw_valid: raw_valid,
             raw: raw,
             typed: typed.map(|h| box h as Box<Header>),
-        }
+        };
+        item.assert_invariants();
+        item
     }
 
     #[deriving(Eq, Clone, Show)]
     struct StrongType(Vec<Vec<u8>>);
+    #[allow(non_camel_case_types)]
+    type st = StrongType;
 
     impl Header for StrongType {
         fn parse_header(raw: &[Vec<u8>]) -> Option<StrongType> {
@@ -229,10 +246,10 @@ mod tests {
             let StrongType(ref vec) = *self;
             let mut first = true;
             for field in vec.iter() {
-                try!(w.write(field.as_slice()));
                 if !first {
                     try!(w.write([',' as u8, ' ' as u8]));
                 }
+                try!(w.write(field.as_slice()));
                 first = false;
             }
             Ok(())
@@ -241,6 +258,8 @@ mod tests {
 
     #[deriving(Eq, Clone, Show)]
     struct NonParsingStrongType(StrongType);
+    #[allow(non_camel_case_types)]
+    type np = NonParsingStrongType;
 
     impl Header for NonParsingStrongType {
         fn parse_header(_raw: &[Vec<u8>]) -> Option<NonParsingStrongType> {
@@ -260,23 +279,43 @@ mod tests {
         if item.typed.is_some() || other.typed.is_some() {
             let it = item.typed.get_ref();
             let ot = other.typed.get_ref();
-            let ir = it.as_ref::<H>().unwrap();
-            let or = ot.as_ref::<H>().unwrap();
+            let ir = it.as_ref::<H>().expect("assert_headers_eq: expected Some item, got None");
+            let or = ot.as_ref::<H>().expect("assert_headers_eq: expected Some other, got None");
             assert_eq!(ir, or);
         }
     }
 
-    fn dummy_raw() -> Vec<Vec<u8>> {
-        vec![vec!['a' as u8, 'b' as u8], vec!['c' as u8, 'd' as u8]]
+    // Dummy 1: multiple headers
+    fn d1raw() -> Vec<Vec<u8>> {
+        vec![Vec::from_slice(bytes!("ab")), Vec::from_slice(bytes!("cd"))]
+        //vec![vec!['a' as u8, 'b' as u8], vec!['c' as u8, 'd' as u8]]
     }
+    fn d1st() -> StrongType { StrongType(d1raw()) }
+    fn d1np() -> NonParsingStrongType { NonParsingStrongType(d1st()) }
 
-    fn dummy_st() -> StrongType {
-        StrongType(dummy_raw())
+    // Dummy 2: 1, but merged
+    fn d2raw() -> Vec<Vec<u8>> {
+        vec![Vec::from_slice(bytes!("ab, cd"))]
+        //vec![vec!['a' as u8, 'b' as u8, ',' as u8, ' ' as u8, 'c' as u8, 'd' as u8]]
     }
+    //fn d2st() -> StrongType { StrongType(d2raw()) }
+    //fn d2np() -> NonParsingStrongType { NonParsingStrongType(d2st()) }
 
-    fn dummy_npst() -> NonParsingStrongType {
-        NonParsingStrongType(dummy_st())
+    // Dummy 3: multiple headers, different from 1
+    fn d3raw() -> Vec<Vec<u8>> {
+        vec![Vec::from_slice(bytes!("12")), Vec::from_slice(bytes!("34"))]
+        //vec![vec!['1' as u8, '2' as u8], vec!['3' as u8, '4' as u8]]
     }
+    fn d3st() -> StrongType { StrongType(d3raw()) }
+    fn d3np() -> NonParsingStrongType { NonParsingStrongType(d3st()) }
+
+    // Dummy 4: 3, but merged
+    fn d4raw() -> Vec<Vec<u8>> {
+        vec![Vec::from_slice(bytes!("12, 34"))]
+        //vec![vec!['1' as u8, '2' as u8, ',' as u8, ' ' as u8, '3' as u8, '4' as u8]]
+    }
+    fn d4st() -> StrongType { StrongType(d4raw()) }
+    //fn d4np() -> NonParsingStrongType { NonParsingStrongType(d4st()) }
 
     #[test]
     #[should_fail]
@@ -294,11 +333,99 @@ mod tests {
 
     #[test]
     fn test_fresh_item_from_typed() {
-        let item = Item::from_typed(dummy_st());
-        assert_headers_eq::<StrongType>(&item, &mkitem(false, None, Some(dummy_st())));
+        let item = Item::from_typed(d1st());
+        assert_headers_eq::<StrongType>(&item, &mkitem(false, None, Some(d1st())));
     }
 
-    #[test]
-    fn test_get_raw() {
+    macro_rules! _thing {
+        (1 $x:ident) => (Some(concat_idents!(d1, $x)()));
+        (2 $x:ident) => (Some(concat_idents!(d2, $x)()));
+        (3 $x:ident) => (Some(concat_idents!(d3, $x)()));
+        (4 $x:ident) => (Some(concat_idents!(d4, $x)()));
+        (- st) => (None::<StrongType>);
+        (- np) => (None::<NonParsingStrongType>);
+        (- $x:tt) => (None);
     }
+    macro_rules! _bool((t)=>(true);(f)=>(false))
+    macro_rules! _item {
+        ($valid:tt, $raw:tt, $ty_n:tt $ty_ty:tt) => {
+            mkitem(_bool!($valid), _thing!($raw raw), _thing!($ty_n $ty_ty))
+        }
+    }
+    macro_rules! t {
+        (
+            $fn_name:ident =>
+            ($s1:tt, $s2:tt, $s3a:tt $s3b:ident)
+            $method:ident ( $(,$args:expr)* )
+            ($e1:tt, $e2:tt, $e3a:tt $e3b:ident)
+        ) => {
+            #[test]
+            fn $fn_name() {
+                let mut item = _item!($s1, $s2, $s3a $s3b);
+                let _ = item.$method($($args),*);
+                assert_headers_eq::<StrongType>(&item, &_item!($e1, $e2, $e3a $e3b));
+            }
+        };
+        (
+            $fn_name:ident =>
+            ($s1:tt, $s2:tt, $s3a:tt $s3b:ident)
+            $method:ident ( $(,$args:expr)* ) / $T:ty
+            ($e1:tt, $e2:tt, $e3a:tt $e3b:ident)
+        ) => {
+            #[test]
+            fn $fn_name() {
+                let mut item = _item!($s1, $s2, $s3a $s3b);
+                let _ = item.$method::<$T>($($args),*);
+                assert_headers_eq::<StrongType>(&item, &_item!($e1, $e2, $e3a $e3b));
+            }
+        }
+    }
+
+    // Now we get down to what is essentially just a big table of tests, verifying every class of
+    // possible behaviour and ensuring that the output is sound.
+    //
+    // I could try explaining it all in detail, but having considered the matter, I've decided that
+    // it's straightforward enough that explanation might be a bit of a waste. I'm sorry if you
+    // disagree with me—I can see that it is a bit of a tangle. Stick at it and you should be able
+    // to understand it. I'm sorry I caused you trouble.
+    // (Fun fact: `1np` is two tokens, `1` and `np`.)
+
+    t!(set_raw_with_raw             => (t, 1, -st) set_raw(,d3raw()) (t, 3, -st))
+    t!(set_raw_with_typed           => (f, -, 1st) set_raw(,d3raw()) (t, 3, -st))
+    t!(set_raw_with_both            => (t, 1, 3st) set_raw(,d3raw()) (t, 3, -st))
+    t!(set_raw_with_invalid_raw     => (f, 1, 3st) set_raw(,d3raw()) (t, 3, -st))
+
+    t!(raw_mut_ref_with_raw         => (t, 1, -st) raw_mut_ref()     (t, 1, -st))
+    t!(raw_mut_ref_with_typed       => (f, -, 1st) raw_mut_ref()     (t, 2, -st))
+    t!(raw_mut_ref_with_both        => (t, 1, 3st) raw_mut_ref()     (t, 1, -st))
+    t!(raw_mut_ref_with_invalid_raw => (f, 1, 3st) raw_mut_ref()     (t, 4, -st))
+
+    t!(raw_ref_with_raw             => (t, 1, -st) raw_ref()         (t, 1, -st))
+    t!(raw_ref_with_typed           => (f, -, 1st) raw_ref()         (t, 2, 1st))
+    t!(raw_ref_with_both            => (t, 1, 3st) raw_ref()         (t, 1, 3st))
+    t!(raw_ref_with_invalid_raw     => (f, 1, 3st) raw_ref()         (t, 4, 3st))
+
+    t!(set_typed_with_raw                      => (t, 1, -st) set_typed(,d3st()) (f, 1, 3st))
+    t!(set_typed_with_typed                    => (f, -, 1st) set_typed(,d3st()) (f, -, 3st))
+    t!(set_typed_with_other                    => (f, -, 1np) set_typed(,d3st()) (f, -, 3st))
+    t!(set_typed_with_other_and_invalid        => (f, 1, 1np) set_typed(,d3st()) (f, 1, 3st))
+    t!(set_typed_with_other_and_raw            => (t, 1, 1np) set_typed(,d3st()) (f, 1, 3st))
+
+    t!(typed_mut_ref_with_raw                  => (t, 1, -st) typed_mut_ref()/st (f, 1, 1st))
+    t!(typed_mut_ref_with_typed                => (f, -, 1st) typed_mut_ref()/st (f, -, 1st))
+    t!(typed_mut_ref_with_other                => (f, -, 3np) typed_mut_ref()/st (f, 4, 4st))
+    t!(typed_mut_ref_with_other_and_invalid    => (f, 1, 3np) typed_mut_ref()/st (f, 4, 4st))
+    t!(typed_mut_ref_with_other_and_raw        => (t, 1, 3np) typed_mut_ref()/st (f, 1, 1st))
+    t!(typed_mut_ref_with_other_np             => (f, -, 3st) typed_mut_ref()/np (f, 4, 3st))
+    t!(typed_mut_ref_with_other_and_invalid_np => (f, 1, 3st) typed_mut_ref()/np (f, 4, 3st))
+    t!(typed_mut_ref_with_other_and_raw_np     => (t, 1, 3st) typed_mut_ref()/np (f, 1, 3st))
+
+    t!(typed_ref_with_raw                      => (t, 1, -st) typed_ref()/st     (t, 1, 1st))
+    t!(typed_ref_with_typed                    => (f, -, 1st) typed_ref()/st     (f, -, 1st))
+    t!(typed_ref_with_other                    => (f, -, 3np) typed_ref()/st     (t, 4, 4st))
+    t!(typed_ref_with_other_and_invalid        => (f, 1, 3np) typed_ref()/st     (t, 4, 4st))
+    t!(typed_ref_with_other_and_raw            => (t, 1, 3np) typed_ref()/st     (t, 1, 1st))
+    t!(typed_ref_with_other_np                 => (f, -, 3st) typed_ref()/np     (t, 4, 3st))
+    t!(typed_ref_with_other_and_invalid_np     => (f, 1, 3st) typed_ref()/np     (t, 4, 3st))
+    t!(typed_ref_with_other_and_raw_np         => (t, 1, 3st) typed_ref()/np     (t, 1, 3st))
 }
