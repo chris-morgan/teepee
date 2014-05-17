@@ -289,29 +289,21 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
     pub fn get_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a H> {
-        let name = header_marker.header_name();
-        self.data.find_mut(&name).and_then(|item| item.typed_ref())
+        self.data.find_mut(&header_marker.header_name()).and_then(|item| item.typed_ref())
     }
 
     /// Get a mutable reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
     pub fn get_mut_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a mut H> {
-        let name = header_marker.header_name();
-        self.data.find_mut(&name).and_then(|item| item.typed_mut_ref())
+        self.data.find_mut(&header_marker.header_name()).and_then(|item| item.typed_mut_ref())
     }
 
     /// Set the named header to the given value.
     pub fn set(&mut self, header_marker: M, value: H) {
-        let name = header_marker.header_name();
-        // XXX: for efficiency, I want something like find_or_insert_with and insert_or_update_with,
-        // except with callbacks for *both* cases, insert and update. At present HashMap does not
-        // provide this. TODO(Chris): implement this upstream.
-        if self.data.contains_key(&name) {
-            self.data.find_mut(&name).unwrap().set_typed(value);
-        } else {
-            self.data.insert(name, Item::from_typed(value));
-        }
+        let _ = self.data.find_with_or_insert_with(header_marker.header_name(), value,
+                                                   |_k, item, value| item.set_typed(value),
+                                                   |_k, value| Item::from_typed(value));
     }
 
     /// Get the raw values of a header, by name.
@@ -343,15 +335,9 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     /// This invalidates the typed representation.
     #[inline]
     pub fn set_raw(&mut self, header_marker: M, value: Vec<Vec<u8>>) {
-        let name = header_marker.header_name();
-        // XXX: for efficiency, I want something like find_or_insert_with and insert_or_update_with,
-        // except with callbacks for *both* cases, insert and update. At present HashMap does not
-        // provide this. TODO(Chris): implement this upstream.
-        if self.data.contains_key(&name) {
-            self.data.find_mut(&name).unwrap().set_raw(value);
-        } else {
-            self.data.insert(name, Item::from_raw(value));
-        }
+        let _ = self.data.find_with_or_insert_with(header_marker.header_name(), value,
+                                                   |_k, item, value| item.set_raw(value),
+                                                   |_k, value| Item::from_raw(value));
     }
 
     /// Remove a header from the collection.
