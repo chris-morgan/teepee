@@ -1,6 +1,7 @@
 //! HTTP status codes.
 
 use std::fmt;
+use std::mem::transmute;
 
 /// An HTTP status code (`Status-Code` in RFC 2616).
 ///
@@ -1611,7 +1612,7 @@ impl FromPrimitive for StatusCode {
         if n < 100 || n > 599 {
             None
         } else {
-            Some(unsafe { ::std::cast::transmute::<u16, StatusCode>(n as u16) })
+            Some(unsafe { transmute::<u16, StatusCode>(n as u16) })
         }
     }
 
@@ -1619,7 +1620,7 @@ impl FromPrimitive for StatusCode {
         if n < 100 || n > 599 {
             None
         } else {
-            Some(unsafe { ::std::cast::transmute::<u16, StatusCode>(n as u16) })
+            Some(unsafe { transmute::<u16, StatusCode>(n as u16) })
         }
     }
 }
@@ -1745,7 +1746,7 @@ impl StatusClass {
     /// ```
     #[inline]
     pub fn default_code(&self) -> StatusCode {
-        unsafe { ::std::cast::transmute::<StatusClass, StatusCode>(*self) }
+        unsafe { transmute::<StatusClass, StatusCode>(*self) }
     }
 }
 
