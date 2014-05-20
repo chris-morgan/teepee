@@ -1581,7 +1581,7 @@ impl fmt::Unsigned for StatusCode {
 /// If you wish to just include the number, use `Unsigned` instead (`{:u}`).
 impl fmt::Show for StatusCode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f.buf, "{} {}", *self as u16,
+        write!(f, "{} {}", *self as u16,
                self.canonical_reason().unwrap_or("<unknown status code>"))
     }
 }

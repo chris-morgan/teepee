@@ -355,7 +355,7 @@ impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let HeaderShowAdapter(h) = *self;
-        h.fmt_header(f.buf)
+        h.fmt_header(f)
     }
 }
 
@@ -363,7 +363,11 @@ impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
 /// Convert a typed header into the raw HTTP header field value.
 pub fn fmt_header<H: Header>(h: &H) -> Vec<u8> {
     let mut output = MemWriter::new();
-    h.fmt_header(&mut output).unwrap();
+    match h.fmt_header(&mut output) {
+        Ok(()) => (),
+        // Doesn’t impl Show at time of writing, so can’t just use .unwrap() ☹
+        Err(_format_error) => fail!("bad fmt_header impl, returned an error!"),
+    }
     output.unwrap()
 }
 
