@@ -247,9 +247,13 @@ mod tests {
             let mut first = true;
             for field in vec.iter() {
                 if !first {
-                    try!(w.write([',' as u8, ' ' as u8]));
+                    if w.write([',' as u8, ' ' as u8]).is_err() {
+                        return Err(fmt::WriteError);
+                    }
                 }
-                try!(w.write(field.as_slice()));
+                if w.write(field.as_slice()).is_err() {
+                    return Err(fmt::WriteError);
+                }
                 first = false;
             }
             Ok(())
