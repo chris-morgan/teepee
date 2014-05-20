@@ -97,8 +97,9 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 ///
 /// Standard usage of this is very simple unit-struct marker types, like this:
 ///
-/// ```rust
+/// ```rust,ignore
 /// // The header data type
+/// #[deriving(Clone)]
 /// pub struct Foo {
 ///     ...
 /// }
@@ -120,6 +121,19 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 /// Then, accessing the header is done like this:
 ///
 /// ```rust
+/// # #[deriving(Clone)] struct Foo;
+/// # impl httpcommon::headers::Header for Foo {
+/// #     fn parse_header(_raw: &[Vec<u8>]) -> Option<Foo> { Some(Foo) }
+/// #     fn fmt_header(&self, w: &mut Writer) -> std::fmt::Result { Ok(()) }
+/// # }
+/// # struct FOO;
+/// # impl httpcommon::headers::HeaderMarker<Foo> for FOO {
+/// #     fn header_name(&self) -> std::str::SendStr { std::str::Slice("foo") }
+/// # }
+/// # struct Request { headers: httpcommon::headers::Headers }
+/// # let mut request = Request { headers: httpcommon::headers::Headers::new() };
+/// # request.headers.set(FOO, Foo);
+/// // Of course, this is assuming that we *know* the header is there
 /// let foo = request.headers.get(FOO).unwrap();
 /// request.headers.set(FOO, foo);
 /// ```
