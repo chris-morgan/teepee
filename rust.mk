@@ -42,7 +42,7 @@ rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) \
 # cratename-quicktest
 #     Quickly run the crate's tests (unoptimised and doesn't depend on the crate being built
 
-define CRATE_RULES
+define CRATE_DEFINITIONS
 SRC_$(1) := $$(call rwildcard,src/$(1)/,*.rs)
 LIB_$(1) := build/$$(shell rustc --crate-file-name src/$(1)/lib.rs --crate-type rlib)
 ifeq ($$(LIB_$(1)),build/)
@@ -51,6 +51,10 @@ ifeq ($$(LIB_$(1)),build/)
 LIB_$(1) := build/lib$(1).dummy
 endif
 
+DEP_LIB_$(1) := $$(foreach dep,$$(DEP_$(1)), $$(LIB_$$(dep)))
+endef
+
+define CRATE_RULES
 $(1): $$(LIB_$(1))
 
 $$(LIB_$(1)): $$(SRC_$(1)) $$(DEP_LIB_$(1))
@@ -71,7 +75,7 @@ build/$(1)-quicktest: $$(SRC_$(1)) $$(DEP_LIB_$(1))
 $(1)-test: $(1) $(1)-doctest build/$(1)-test
 	build/$(1)-test --test
 
-$(1)-doctest: $$(SRC_$(1)) $$(DEP_LIB_$(1))
+$(1)-doctest: $$(SRC_$(1)) $$(LIB_$(1)) $$(DEP_LIB_$(1))
 	$$(RUSTDOC) -L build --test src/$(1)/lib.rs
 
 # Can't wait for everything to build, optimised too? OK, you can save some time here.
@@ -79,12 +83,11 @@ $(1)-quicktest: build/$(1)-quicktest
 	build/$(1)-quicktest --test
 
 .PHONY: $(1) $(1)-test $(1)-doctest $(1)-quicktest $(1)-docs
-
-DEP_LIB_$(1) := $$(foreach dep,$$(DEP_$(1)), $$(LIB_$$(dep)))
 SRC_ALL := $$(SRC_ALL) $$(SRC_$(1))
 
 endef
 
+$(foreach crate,$(CRATES),$(eval $(call CRATE_DEFINITIONS,$(crate))))
 $(foreach crate,$(CRATES),$(eval $(call CRATE_RULES,$(crate))))
 
 docs: $(foreach crate,$(CRATES), doc/$(crate)/index.html)
