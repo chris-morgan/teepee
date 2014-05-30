@@ -207,8 +207,9 @@ impl Item {
 mod tests {
     use super::Item;
     use super::super::Header;
-    use std::fmt;
+    use std::{fmt, io};
     use std::any::AnyRefExt;
+    use std::io::IoResult;
 
     // Until https://github.com/mozilla/rust/issues/9052 is fixed, the super:: is needed.
     #[allow(unnecessary_qualification)]
@@ -242,17 +243,17 @@ mod tests {
             Some(StrongType(raw.iter().map(|x| x.clone()).collect()))
         }
 
-        fn fmt_header(&self, w: &mut Writer) -> fmt::Result {
+        fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
             let StrongType(ref vec) = *self;
             let mut first = true;
             for field in vec.iter() {
                 if !first {
                     if w.write([',' as u8, ' ' as u8]).is_err() {
-                        return Err(fmt::WriteError);
+                        return Err(io::IoError::from_errno(0, false));
                     }
                 }
                 if w.write(field.as_slice()).is_err() {
-                    return Err(fmt::WriteError);
+                    return Err(io::IoError::from_errno(0, false));
                 }
                 first = false;
             }
@@ -270,7 +271,7 @@ mod tests {
             None
         }
 
-        fn fmt_header(&self, w: &mut Writer) -> fmt::Result {
+        fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
             let NonParsingStrongType(ref st) = *self;
             st.fmt_header(w)
         }
