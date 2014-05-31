@@ -4,7 +4,7 @@ use std::any::{Any, AnyRefExt};
 use std::mem::{transmute, transmute_copy};
 use std::intrinsics::TypeId;
 use std::fmt;
-use std::io::MemWriter;
+use std::io::{MemWriter, IoResult};
 use std::raw::TraitObject;
 use std::str::SendStr;
 
@@ -30,7 +30,7 @@ pub trait Header: Any {
     /// accessing a cached Box<Header> object as a different type; then, it is shoved into a buffer
     /// through fmt_header and then back into the new type through parse_header. Should the
     /// fmt_header call have return an Err, it will fail.
-    fn fmt_header(&self, writer: &mut Writer) -> fmt::Result;
+    fn fmt_header(&self, writer: &mut Writer) -> IoResult<()>;
 }
 
 // impl copied from std::any. Not especially nice, sorry :-(
@@ -121,10 +121,11 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 /// Then, accessing the header is done like this:
 ///
 /// ```rust
+/// # use std;
 /// # #[deriving(Clone)] struct Foo;
 /// # impl httpcommon::headers::Header for Foo {
 /// #     fn parse_header(_raw: &[Vec<u8>]) -> Option<Foo> { Some(Foo) }
-/// #     fn fmt_header(&self, w: &mut Writer) -> std::fmt::Result { Ok(()) }
+/// #     fn fmt_header(&self, w: &mut Writer) -> std::io::IoResult<()> { Ok(()) }
 /// # }
 /// # struct FOO;
 /// # impl httpcommon::headers::HeaderMarker<Foo> for FOO {
@@ -158,7 +159,7 @@ impl Header for Box<Header> {
         None
     }
 
-    fn fmt_header(&self, w: &mut Writer) -> fmt::Result {
+    fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
         self.fmt_header(w)
     }
 }
@@ -169,7 +170,7 @@ impl<'a> Header for &'a Header {
         None
     }
 
-    fn fmt_header(&self, w: &mut Writer) -> fmt::Result {
+    fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
         self.fmt_header(w)
     }
 }
@@ -369,7 +370,10 @@ impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let HeaderShowAdapter(h) = *self;
-        h.fmt_header(f)
+        match h.fmt_header(f) {
+            Ok(v) => Ok(v),
+            Err(_) => Err(fmt::WriteError)
+        }
     }
 }
 
