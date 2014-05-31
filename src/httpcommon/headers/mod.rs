@@ -367,14 +367,12 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
 struct HeaderShowAdapter<'a, H>(pub &'a H);
 
 impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
-    #[allow(unused_variable)]
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let HeaderShowAdapter(h) = *self;
-        let r = h.fmt_header(f);
-        match r {
+        match h.fmt_header(f) {
             Ok(v) => Ok(v),
-            Err(e) => Err(fmt::WriteError)
+            Err(_) => Err(fmt::WriteError)
         }
     }
 }
