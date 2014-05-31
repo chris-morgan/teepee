@@ -207,7 +207,7 @@ impl Item {
 mod tests {
     use super::Item;
     use super::super::Header;
-    use std::{fmt, io};
+    use std::fmt;
     use std::any::AnyRefExt;
     use std::io::IoResult;
 
