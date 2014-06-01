@@ -233,7 +233,7 @@ mod tests {
         item
     }
 
-    #[deriving(Eq, Clone, Show)]
+    #[deriving(PartialEq, Eq, Clone, Show)]
     struct StrongType(Vec<Vec<u8>>);
     #[allow(non_camel_case_types)]
     type st = StrongType;
@@ -257,7 +257,7 @@ mod tests {
         }
     }
 
-    #[deriving(Eq, Clone, Show)]
+    #[deriving(PartialEq, Eq, Clone, Show)]
     struct NonParsingStrongType(StrongType);
     #[allow(non_camel_case_types)]
     type np = NonParsingStrongType;
@@ -273,7 +273,7 @@ mod tests {
         }
     }
 
-    fn assert_headers_eq<H: Header + Clone + Eq + fmt::Show + 'static>(item: &Item, other: &Item) {
+    fn assert_headers_eq<H: Header + Clone + PartialEq + fmt::Show + 'static>(item: &Item, other: &Item) {
         item.assert_invariants();
         assert_eq!(item.raw_valid, other.raw_valid);
         assert_eq!(item.raw, other.raw);
