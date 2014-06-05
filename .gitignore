@@ -10,3 +10,4 @@ doc/.lock
 doc/*.js
 doc/*.css
 doc/*.woff
+doc/implementors/
