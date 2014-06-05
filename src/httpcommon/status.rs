@@ -1552,13 +1552,18 @@ impl StatusCode {
 
     /// Determine the class of a status code, based on its first digit.
     pub fn class(&self) -> StatusClass {
-        match *self as u16 {
-            100..199 => Informational,
-            200..299 => Success,
-            300..399 => Redirection,
-            400..499 => ClientError,
-            500..599 => ServerError,
-            _ => unreachable!(),
+        let code = *self as u16;  // Range of possible values: 100..599.
+        // We could match 100..199 &c., but this way we avoid unreachable!() at the end.
+        if code < 200 {
+            Informational
+        } else if code < 300 {
+            Success
+        } else if code < 400 {
+            Redirection
+        } else if code < 500 {
+            ClientError
+        } else {
+            ServerError
         }
     }
 }
