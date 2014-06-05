@@ -381,11 +381,9 @@ impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
 /// Convert a typed header into the raw HTTP header field value.
 pub fn fmt_header<H: Header>(h: &H) -> Vec<u8> {
     let mut output = MemWriter::new();
-    match h.fmt_header(&mut output) {
-        Ok(()) => (),
-        // Doesn’t impl Show at time of writing, so can’t just use .unwrap() ☹
-        Err(_format_error) => fail!("bad fmt_header impl, returned an error!"),
-    }
+    // Result.unwrap() is correct here, for MemWriter won’t make an IoError,
+    // and fmt_header is not permitted to introduce one of its own.
+    h.fmt_header(&mut output).unwrap();
     output.unwrap()
 }
 
