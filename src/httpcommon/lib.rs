@@ -26,7 +26,5 @@
 #![deny(unused_result)]
 #![deny(deprecated_owned_vector)]
 
-extern crate collections;
-
 pub mod status;
 pub mod headers;

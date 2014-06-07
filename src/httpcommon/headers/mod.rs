@@ -8,7 +8,7 @@ use std::io::{MemWriter, IoResult};
 use std::raw::TraitObject;
 use std::str::SendStr;
 
-use collections::hashmap::HashMap;
+use std::collections::hashmap::HashMap;
 
 use self::internals::Item;
 
