@@ -24,7 +24,6 @@
 #![deny(missing_doc)]
 //#![deny(unstable)]
 #![deny(unused_result)]
-#![deny(deprecated_owned_vector)]
 
 pub mod status;
 pub mod headers;

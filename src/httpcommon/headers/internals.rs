@@ -39,7 +39,7 @@ pub struct Item {
     raw: Option<Vec<Vec<u8>>>,
 
     /// A strongly typed header which has been parsed from the raw value.
-    typed: Option<Box<Header>:'static>,
+    typed: Option<Box<Header> + 'static>,
 }
 
 impl Item {

@@ -15,7 +15,6 @@
 #![deny(missing_doc)]
 //#![deny(unstable)]
 #![deny(unused_result)]
-#![deny(deprecated_owned_vector)]
 
 extern crate httpcommon;
 
