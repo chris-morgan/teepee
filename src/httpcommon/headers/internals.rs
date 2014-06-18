@@ -248,7 +248,7 @@ mod tests {
             let mut first = true;
             for field in vec.iter() {
                 if !first {
-                    try!(w.write([',' as u8, ' ' as u8]))
+                    try!(w.write(b", "))
                 }
                 try!(w.write(field.as_slice()))
                 first = false;
@@ -288,32 +288,32 @@ mod tests {
 
     // Dummy 1: multiple headers
     fn d1raw() -> Vec<Vec<u8>> {
-        vec![Vec::from_slice(bytes!("ab")), Vec::from_slice(bytes!("cd"))]
-        //vec![vec!['a' as u8, 'b' as u8], vec!['c' as u8, 'd' as u8]]
+        vec![Vec::from_slice(b"ab"), Vec::from_slice(b"cd")]
+        //vec![vec![b'a', b'b'], vec![b'c', b'd']]
     }
     fn d1st() -> StrongType { StrongType(d1raw()) }
     fn d1np() -> NonParsingStrongType { NonParsingStrongType(d1st()) }
 
     // Dummy 2: 1, but merged
     fn d2raw() -> Vec<Vec<u8>> {
-        vec![Vec::from_slice(bytes!("ab, cd"))]
-        //vec![vec!['a' as u8, 'b' as u8, ',' as u8, ' ' as u8, 'c' as u8, 'd' as u8]]
+        vec![Vec::from_slice(b"ab, cd")]
+        //vec![vec![b'a', b'b', b',', b' ', b'c', b'd']]
     }
     //fn d2st() -> StrongType { StrongType(d2raw()) }
     //fn d2np() -> NonParsingStrongType { NonParsingStrongType(d2st()) }
 
     // Dummy 3: multiple headers, different from 1
     fn d3raw() -> Vec<Vec<u8>> {
-        vec![Vec::from_slice(bytes!("12")), Vec::from_slice(bytes!("34"))]
-        //vec![vec!['1' as u8, '2' as u8], vec!['3' as u8, '4' as u8]]
+        vec![Vec::from_slice(b"12"), Vec::from_slice(b"34")]
+        //vec![vec![b'1', b'2'], vec![b'3', b'4']]
     }
     fn d3st() -> StrongType { StrongType(d3raw()) }
     fn d3np() -> NonParsingStrongType { NonParsingStrongType(d3st()) }
 
     // Dummy 4: 3, but merged
     fn d4raw() -> Vec<Vec<u8>> {
-        vec![Vec::from_slice(bytes!("12, 34"))]
-        //vec![vec!['1' as u8, '2' as u8, ',' as u8, ' ' as u8, '3' as u8, '4' as u8]]
+        vec![Vec::from_slice(b"12, 34")]
+        //vec![vec![b'1', b'2', b',', b' ', b'3', b'4']]
     }
     fn d4st() -> StrongType { StrongType(d4raw()) }
     //fn d4np() -> NonParsingStrongType { NonParsingStrongType(d4st()) }

@@ -405,9 +405,9 @@ mod tests {
 
         headers.set(EXPIRES, Past);
         assert_eq!(headers.mostly_get(&EXPIRES), &mut Typed(box Past));
-        expect(headers.get(EXPIRES), Past, bytes!("0"));
-        assert_eq!(headers.get_raw("expires"), vec![vec!['0' as u8]]);
-        expect(headers.get(EXPIRES), Past, bytes!("0"));
+        expect(headers.get(EXPIRES), Past, b"0");
+        assert_eq!(headers.get_raw("expires"), vec![vec![b'0']]);
+        expect(headers.get(EXPIRES), Past, b"0");
 
         headers.remove(&EXPIRES);
         assert_eq!(headers.get(EXPIRES), None);
