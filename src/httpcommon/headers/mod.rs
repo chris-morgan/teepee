@@ -231,28 +231,32 @@ impl<'a> Header for &'a Header {
 ///
 /// In HTTP/1.1, a message header is defined like this (RFC 2616, section 4.2 Message Headers):
 ///
-///         message-header = field-name ":" [ field-value ]
-///         field-name     = token
-///         field-value    = *( field-content | LWS )
-///         field-content  = <the OCTETs making up the field-value
-///                          and consisting of either *TEXT or combinations
-///                          of token, separators, and quoted-string>
+/// ```ignore
+///     message-header = field-name ":" [ field-value ]
+///     field-name     = token
+///     field-value    = *( field-content | LWS )
+///     field-content  = <the OCTETs making up the field-value
+///                      and consisting of either *TEXT or combinations
+///                      of token, separators, and quoted-string>
+/// ```
 ///
 /// This is something all web developers should be at least basically familiar with.
 ///
 /// The interesting part comes a little later in that section and is to do with how message headers
 /// *combine*:
 ///
-///     Multiple message-header fields with the same field-name MAY be
-///     present in a message if and only if the entire field-value for that
-///     header field is defined as a comma-separated list [i.e., #(values)].
-///     It MUST be possible to combine the multiple header fields into one
-///     "field-name: field-value" pair, without changing the semantics of the
-///     message, by appending each subsequent field-value to the first, each
-///     separated by a comma. The order in which header fields with the same
-///     field-name are received is therefore significant to the
-///     interpretation of the combined field value, and thus a proxy MUST NOT
-///     change the order of these field values when a message is forwarded.
+/// ```ignore
+/// Multiple message-header fields with the same field-name MAY be
+/// present in a message if and only if the entire field-value for that
+/// header field is defined as a comma-separated list [i.e., #(values)].
+/// It MUST be possible to combine the multiple header fields into one
+/// "field-name: field-value" pair, without changing the semantics of the
+/// message, by appending each subsequent field-value to the first, each
+/// separated by a comma. The order in which header fields with the same
+/// field-name are received is therefore significant to the
+/// interpretation of the combined field value, and thus a proxy MUST NOT
+/// change the order of these field values when a message is forwarded.
+/// ```
 ///
 /// In this library, what we call a header is not a single message header, but rather the
 /// combination of all message headers with the same field name; that is, a field-name plus *all*
