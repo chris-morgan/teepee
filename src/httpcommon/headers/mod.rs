@@ -205,7 +205,7 @@ impl<'a> Header for &'a Header {
 ///
 /// One thing out of the ordinary to be aware of is that all of these methods take `&mut self`, even
 /// `get` and `get_ref`; this is not ideal, but it is thus for a very good reason, an outcome of the
-/// hybrid typed/raw approach employed. The main practial effect of this is that you cannot take
+/// hybrid typed/raw approach employed. The main practical effect of this is that you cannot take
 /// references to more than one header at once; where possible, use `get_ref`, but it is
 /// acknowledged that it will not always be feasible to use it: this is why `get` exists, which
 /// clones the value, thus releasing the lock on the header collection.
