@@ -1,6 +1,6 @@
 //! The Teepee HTTP client.
 
-#![crate_id = "httpc#0.1-pre"]
+#![crate_name = "httpc"]
 #![comment = "The Teepee HTTP client"]
 #![license = "MIT/ASL2"]
 #![crate_type = "dylib"]
