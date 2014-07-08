@@ -44,7 +44,7 @@ rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) \
 
 define CRATE_DEFINITIONS
 SRC_$(1) := $$(call rwildcard,src/$(1)/,*.rs)
-LIB_$(1) := build/$$(shell rustc --crate-file-name src/$(1)/lib.rs --crate-type rlib)
+LIB_$(1) := build/$$(shell rustc --print-file-name src/$(1)/lib.rs --crate-type rlib)
 ifeq ($$(LIB_$(1)),build/)
 # We may not have rustc or the lib.rs file may be broken.
 # But don't break the rules on that account.

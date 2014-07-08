@@ -1,6 +1,6 @@
 //! The Teepee HTTP server.
 
-#![crate_id = "httpd#0.1-pre"]
+#![crate_name = "httpd"]
 #![comment = "The Teepee HTTP server"]
 #![license = "MIT/ASL2"]
 #![crate_type = "dylib"]

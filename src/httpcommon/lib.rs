@@ -7,7 +7,7 @@
 //! should be exported in the root of the HTTP client crate ``httpc`` so that people can write
 //! ``httpc::status`` instead of ``httpcommon::status``.
 
-#![crate_id = "httpcommon#0.1-pre"]
+#![crate_name = "httpcommon"]
 #![comment = "Common HTTP functionality for the Teepee project"]
 #![license = "MIT/ASL2"]
 #![crate_type = "dylib"]
