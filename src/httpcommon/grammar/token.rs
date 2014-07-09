@@ -99,13 +99,14 @@ impl<'a> Collection for Token<'a> {
 impl Token<'static> {
     /// Create a `Token` from a sequence of bytes.
     ///
-    /// Returns `None` if not every byte in the vector is a RFC 7230 `tchar`.
+    /// Returns `Err` with the original vector if not every byte in the vector
+    /// is an RFC 7230 `tchar`.
     #[inline]
-    pub fn from_vec(vec: Vec<u8>) -> Option<Token<'static>> {
+    pub fn from_vec(vec: Vec<u8>) -> Result<Token<'static>, Vec<u8>> {
         if vec.iter().all(|&c| is_tchar(c)) {
-            Some(Owned { _bytes: vec })
+            Ok(Owned { _bytes: vec })
         } else {
-            None
+            Err(vec)
         }
     }
 
