@@ -122,8 +122,6 @@ impl<'a> Token<'a> {
     /// Create a `Token` from a sequence of bytes.
     ///
     /// Returns `None` if not every byte in the slice is a RFC 7230 `tchar`.
-    ///
-    /// This incurs an allocation.
     pub fn from_slice(slice: &'a [u8]) -> Option<Token<'a>> {
         if slice.iter().all(|&c| is_tchar(c)) {
             Some(Slice { _bytes: slice })
@@ -134,7 +132,7 @@ impl<'a> Token<'a> {
 
     /// Create a `Token` from a sequence of bytes, without checking it.
     ///
-    /// This incurs an allocation. Also be very careful calling this.
+    /// Be very careful calling this.
     pub unsafe fn from_slice_nocheck(slice: &'a [u8]) -> Token<'a> {
         Slice { _bytes: slice }
     }
