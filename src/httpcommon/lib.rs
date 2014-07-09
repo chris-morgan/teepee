@@ -16,7 +16,7 @@
 #![doc(html_logo_url = "http://teepee.rs/logo.100.png",
        html_root_url = "http://www.rust-ci.org/teepee/teepee/doc/")]
 
-#![feature(globs, macro_rules)]
+#![feature(globs, macro_rules, phase, struct_variant)]
 
 #![deny(unnecessary_qualification)]
 #![deny(non_uppercase_statics)]
@@ -25,5 +25,11 @@
 //#![deny(unstable)]
 #![deny(unused_result)]
 
+#[phase(plugin)]
+extern crate phf_mac;
+extern crate phf;
+
+pub mod method;
 pub mod status;
 pub mod headers;
+pub mod grammar;

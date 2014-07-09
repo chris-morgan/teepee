@@ -19,3 +19,9 @@ path = "src/httpd/lib.rs"
 
 #[dependencies.openssl]
 #git = "https://github.com/sfackler/rust-openssl.git"
+
+[dependencies.phf]
+git = "https://github.com/sfackler/rust-phf.git"
+
+[dependencies.phf_mac]
+git = "https://github.com/sfackler/rust-phf.git"
