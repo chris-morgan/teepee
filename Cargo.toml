@@ -1,0 +1,21 @@
+[package]
+name = "teepee"
+version = "0.0.0"
+#readme = "README.md"
+authors = [ "Chris Morgan <me@chrismorgan.info>" ]
+#tags = ["web", "http", "library"]
+
+[[lib]]
+name = "httpcommon"
+path = "src/httpcommon/lib.rs"
+
+[[lib]]
+name = "httpc"
+path = "src/httpc/lib.rs"
+
+[[lib]]
+name = "httpd"
+path = "src/httpd/lib.rs"
+
+#[dependencies.openssl]
+#git = "https://github.com/sfackler/rust-openssl.git"
