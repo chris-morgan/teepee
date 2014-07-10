@@ -146,7 +146,9 @@ impl<'a> Token<'a> {
         Slice { _bytes: self.as_bytes() }
     }
 
-    /// Make a clone of the token
+    /// Change a slice token into an owned token.
+    ///
+    /// An owned token will be unchanged.
     #[inline]
     pub fn into_owned(self) -> Token<'static> {
         match self {
