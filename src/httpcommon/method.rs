@@ -2,6 +2,7 @@
 //!
 //! See the `Method` type for all the information your heart desires.
 use std::fmt;
+use std::mem;
 
 use phf::PhfMap;
 
@@ -135,6 +136,25 @@ macro_rules! method_enum {
             /// See also `from_token`.
             pub fn registered_from_token(token: Token) -> Option<Method<'static>> {
                 REGISTERED_METHODS.find(&token.as_str()).map(|t| t.clone())
+            }
+
+            /// Change a slice-token-based method to use an owned-token.
+            ///
+            /// This may incur an allocation, but fixes the lifetime up.
+            #[inline]
+            pub fn into_owned(self) -> Method<'static> {
+                match self {
+                    UnregisteredMethod { name, safe, idempotent } =>
+                        UnregisteredMethod {
+                            name: name.into_owned(),
+                            safe: safe,
+                            idempotent: idempotent,
+                        },
+                    // Let’s fix the lifetime issue in one fell swoop. This is entirely reasonable,
+                    // for they are all simple discriminants. I just don’t want to write
+                    // `$($ident => $ident,)*`, if it’s all the same to you.
+                    registered_method => unsafe { mem::transmute(registered_method) },
+                }
             }
 
             /// Retrieve the method name.
