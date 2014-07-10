@@ -18,12 +18,12 @@
 
 #![feature(globs, macro_rules, phase, struct_variant)]
 
-#![deny(unnecessary_qualification)]
-#![deny(non_uppercase_statics)]
-#![deny(unnecessary_typecast)]
-#![deny(missing_doc)]
-//#![deny(unstable)]
-#![deny(unused_result)]
+#![warn(unnecessary_qualification)]
+#![warn(non_uppercase_statics)]
+#![warn(unnecessary_typecast)]
+#![warn(missing_doc)]
+//#![warn(unstable)]
+#![warn(unused_result)]
 
 #[phase(plugin)]
 extern crate phf_mac;
