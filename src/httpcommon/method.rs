@@ -12,14 +12,13 @@ use grammar::token::Token;
 macro_rules! method_enum {
     ($(
         $ident:ident
-        $string:expr
         $bytes:expr
         $safe:ident
         $idempotent:ident
         #[$doc:meta];
     )*) => {
-        static REGISTERED_METHODS: PhfMap<Method<'static>> = phf_map!(
-            $($string => $ident,)*
+        static REGISTERED_METHODS: PhfMap<&'static [u8], Method<'static>> = phf_map!(
+            $($bytes => $ident,)*
         );
 
         /// An HTTP method.
@@ -99,7 +98,7 @@ macro_rules! method_enum {
             ///
             /// See also `registered_from_token`.
             pub fn from_token<'a>(token: Token<'a>) -> Method<'a> {
-                match REGISTERED_METHODS.find(&token.as_str()) {
+                match REGISTERED_METHODS.find_equiv(&token.as_bytes()) {
                     Some(registered_token) => registered_token.clone(),
                     None => UnregisteredMethod {
                         name: token,
@@ -135,7 +134,7 @@ macro_rules! method_enum {
             ///
             /// See also `from_token`.
             pub fn registered_from_token(token: Token) -> Option<Method<'static>> {
-                REGISTERED_METHODS.find(&token.as_str()).map(|t| t.clone())
+                REGISTERED_METHODS.find_equiv(&token.as_bytes()).map(|t| t.clone())
             }
 
             /// Change a slice-token-based method to use an owned-token.
@@ -318,43 +317,43 @@ macro_rules! method_enum {
 // macro. Making phf cope with byte literals would help too, and sfackler has said he would accept
 // a change from PhfMap<V> to PhfMap<K, V>.
 method_enum! {
-    // Variant name   method name string  method name bytes    safe  idempotent
-    Acl               "ACL"               b"ACL"               false true  #[doc = "`ACL`, defined in [RFC 3744, section 8.1](https://tools.ietf.org/html/rfc3744#section-8.1). Not safe, but idempotent."];
-    BaselineControl   "BASELINE-CONTROL"  b"BASELINE-CONTROL"  false true  #[doc = "`BASELINE-CONTROL`, defined in [RFC 3253, section 12.6](https://tools.ietf.org/html/rfc3253#section-12.6). Not safe, but idempotent."];
-    Bind              "BIND"              b"BIND"              false true  #[doc = "`BIND`, defined in [RFC 5842, section 4](https://tools.ietf.org/html/rfc5842#section-4). Not safe, but idempotent."];
-    Checkin           "CHECKIN"           b"CHECKIN"           false true  #[doc = "`CHECKIN`, defined in [RFC 3253, section 4.4](https://tools.ietf.org/html/rfc3253#section-4.4) and [section 9.4](https://tools.ietf.org/html/rfc3253#section-9.4). Not safe, but idempotent."];
-    Checkout          "CHECKOUT"          b"CHECKOUT"          false true  #[doc = "`CHECKOUT`, defined in [RFC 3253, section 4.3](https://tools.ietf.org/html/rfc3253#section-4.3) and [section 8.8](https://tools.ietf.org/html/rfc3253#section-8.8). Not safe, but idempotent."];
-    Connect           "CONNECT"           b"CONNECT"           false false #[doc = "`CONNECT`, defined in [RFC 7231, section 4.3.6](https://tools.ietf.org/html/rfc7231#section-4.3.6). Not safe and not idempotent."];
-    Copy              "COPY"              b"COPY"              false true  #[doc = "`COPY`, defined in [RFC 4918, section 9.8](https://tools.ietf.org/html/rfc4918#section-9.8). Not safe, but idempotent."];
-    Delete            "DELETE"            b"DELETE"            false true  #[doc = "`DELETE`, defined in [RFC 7231, section 4.3.5](https://tools.ietf.org/html/rfc7231#section-4.3.5). Not safe, but idempotent."];
-    Get               "GET"               b"GET"               true  true  #[doc = "`GET`, defined in [RFC 7231, section 4.3.1](https://tools.ietf.org/html/rfc7231#section-4.3.1). Safe and idempotent."];
-    Head              "HEAD"              b"HEAD"              true  true  #[doc = "`HEAD`, defined in [RFC 7231, section 4.3.2](https://tools.ietf.org/html/rfc7231#section-4.3.2). Safe and idempotent."];
-    Label             "LABEL"             b"LABEL"             false true  #[doc = "`LABEL`, defined in [RFC 3253, section 8.2](https://tools.ietf.org/html/rfc3253#section-8.2). Not safe, but idempotent."];
-    Link              "LINK"              b"LINK"              false true  #[doc = "`LINK`, defined in [RFC 2068, section 19.6.1.2](https://tools.ietf.org/html/rfc2068#section-19.6.1.2). Not safe, but idempotent."];
-    Lock              "LOCK"              b"LOCK"              false false #[doc = "`LOCK`, defined in [RFC 4918, section 9.10](https://tools.ietf.org/html/rfc4918#section-9.10). Not safe and not idempotent."];
-    Merge             "MERGE"             b"MERGE"             false true  #[doc = "`MERGE`, defined in [RFC 3253, section 11.2](https://tools.ietf.org/html/rfc3253#section-11.2). Not safe, but idempotent."];
-    MkActivity        "MKACTIVITY"        b"MKACTIVITY"        false true  #[doc = "`MKACTIVITY`, defined in [RFC 3253, section 13.5](https://tools.ietf.org/html/rfc3253#section-13.5). Not safe, but idempotent."];
-    MkCalendar        "MKCALENDAR"        b"MKCALENDAR"        false true  #[doc = "`MKCALENDAR`, defined in [RFC 4791, section 5.3.1](https://tools.ietf.org/html/rfc4791#section-5.3.1). Not safe, but idempotent."];
-    MkCol             "MKCOL"             b"MKCOL"             false true  #[doc = "`MKCOL`, defined in [RFC 4918, section 9.3](https://tools.ietf.org/html/rfc4918#section-9.3). Not safe, but idempotent."];
-    MkRedirectRef     "MKREDIRECTREF"     b"MKREDIRECTREF"     false true  #[doc = "`MKREDIRECTREF`, defined in [RFC 4437, section 6](https://tools.ietf.org/html/rfc4437#section-6). Not safe, but idempotent."];
-    MkWorkspace       "MKWORKSPACE"       b"MKWORKSPACE"       false true  #[doc = "`MKWORKSPACE`, defined in [RFC 3253, section 6.3](https://tools.ietf.org/html/rfc3253#section-6.3). Not safe, but idempotent."];
-    Move              "MOVE"              b"MOVE"              false true  #[doc = "`MOVE`, defined in [RFC 4918, section 9.9](https://tools.ietf.org/html/rfc4918#section-9.9). Not safe, but idempotent."];
-    Options           "OPTIONS"           b"OPTIONS"           true  true  #[doc = "`OPTIONS`, defined in [RFC 7231, section 4.3.7](https://tools.ietf.org/html/rfc7231#section-4.3.7). Safe and idempotent."];
-    OrderPatch        "ORDERPATCH"        b"ORDERPATCH"        false true  #[doc = "`ORDERPATCH`, defined in [RFC 3648, section 7](https://tools.ietf.org/html/rfc3648#section-7). Not safe, but idempotent."];
-    Patch             "PATCH"             b"PATCH"             false false #[doc = "`PATCH`, defined in [RFC 5789, section 2](https://tools.ietf.org/html/rfc5789#section-2). Not safe and not idempotent."];
-    Post              "POST"              b"POST"              false false #[doc = "`POST`, defined in [RFC 7231, section 4.3.3](https://tools.ietf.org/html/rfc7231#section-4.3.3). Not safe and not idempotent."];
-    PropFind          "PROPFIND"          b"PROPFIND"          true  true  #[doc = "`PROPFIND`, defined in [RFC 4918, section 9.1](https://tools.ietf.org/html/rfc4918#section-9.1). Safe and idempotent."];
-    PropPatch         "PROPPATCH"         b"PROPPATCH"         false true  #[doc = "`PROPPATCH`, defined in [RFC 4918, section 9.2](https://tools.ietf.org/html/rfc4918#section-9.2). Not safe, but idempotent."];
-    Put               "PUT"               b"PUT"               false true  #[doc = "`PUT`, defined in [RFC 7231, section 4.3.4](https://tools.ietf.org/html/rfc7231#section-4.3.4). Not safe, but idempotent."];
-    Rebind            "REBIND"            b"REBIND"            false true  #[doc = "`REBIND`, defined in [RFC 5842, section 6](https://tools.ietf.org/html/rfc5842#section-6). Not safe, but idempotent."];
-    Report            "REPORT"            b"REPORT"            true  true  #[doc = "`REPORT`, defined in [RFC 3253, section 3.6](https://tools.ietf.org/html/rfc3253#section-3.6). Safe and idempotent."];
-    Search            "SEARCH"            b"SEARCH"            true  true  #[doc = "`SEARCH`, defined in [RFC 5323, section 2](https://tools.ietf.org/html/rfc5323#section-2). Safe and idempotent."];
-    Trace             "TRACE"             b"TRACE"             true  true  #[doc = "`TRACE`, defined in [RFC 7231, section 4.3.8](https://tools.ietf.org/html/rfc7231#section-4.3.8). Safe and idempotent."];
-    Unbind            "UNBIND"            b"UNBIND"            false true  #[doc = "`UNBIND`, defined in [RFC 5842, section 5](https://tools.ietf.org/html/rfc5842#section-5). Not safe, but idempotent."];
-    Uncheckout        "UNCHECKOUT"        b"UNCHECKOUT"        false true  #[doc = "`UNCHECKOUT`, defined in [RFC 3253, section 4.5](https://tools.ietf.org/html/rfc3253#section-4.5). Not safe, but idempotent."];
-    Unlink            "UNLINK"            b"UNLINK"            false true  #[doc = "`UNLINK`, defined in [RFC 2068, section 19.6.1.3](https://tools.ietf.org/html/rfc2068#section-19.6.1.3). Not safe, but idempotent."];
-    Unlock            "UNLOCK"            b"UNLOCK"            false true  #[doc = "`UNLOCK`, defined in [RFC 4918, section 9.11](https://tools.ietf.org/html/rfc4918#section-9.11). Not safe, but idempotent."];
-    Update            "UPDATE"            b"UPDATE"            false true  #[doc = "`UPDATE`, defined in [RFC 3253, section 7.1](https://tools.ietf.org/html/rfc3253#section-7.1). Not safe, but idempotent."];
-    UpdateRedirectRef "UPDATEREDIRECTREF" b"UPDATEREDIRECTREF" false true  #[doc = "`UPDATEREDIRECTREF`, defined in [RFC 4437, section 7](https://tools.ietf.org/html/rfc4437#section-7). Not safe, but idempotent."];
-    VersionControl    "VERSION-CONTROL"   b"VERSION-CONTROL"   false true  #[doc = "`VERSION-CONTROL`, defined in [RFC 3253, section 3.5](https://tools.ietf.org/html/rfc3253#section-3.5). Not safe, but idempotent."];
+    // Variant name   method name bytes    safe  idempotent
+    Acl               b"ACL"               false true  #[doc = "`ACL`, defined in [RFC 3744, section 8.1](https://tools.ietf.org/html/rfc3744#section-8.1). Not safe, but idempotent."];
+    BaselineControl   b"BASELINE-CONTROL"  false true  #[doc = "`BASELINE-CONTROL`, defined in [RFC 3253, section 12.6](https://tools.ietf.org/html/rfc3253#section-12.6). Not safe, but idempotent."];
+    Bind              b"BIND"              false true  #[doc = "`BIND`, defined in [RFC 5842, section 4](https://tools.ietf.org/html/rfc5842#section-4). Not safe, but idempotent."];
+    Checkin           b"CHECKIN"           false true  #[doc = "`CHECKIN`, defined in [RFC 3253, section 4.4](https://tools.ietf.org/html/rfc3253#section-4.4) and [section 9.4](https://tools.ietf.org/html/rfc3253#section-9.4). Not safe, but idempotent."];
+    Checkout          b"CHECKOUT"          false true  #[doc = "`CHECKOUT`, defined in [RFC 3253, section 4.3](https://tools.ietf.org/html/rfc3253#section-4.3) and [section 8.8](https://tools.ietf.org/html/rfc3253#section-8.8). Not safe, but idempotent."];
+    Connect           b"CONNECT"           false false #[doc = "`CONNECT`, defined in [RFC 7231, section 4.3.6](https://tools.ietf.org/html/rfc7231#section-4.3.6). Not safe and not idempotent."];
+    Copy              b"COPY"              false true  #[doc = "`COPY`, defined in [RFC 4918, section 9.8](https://tools.ietf.org/html/rfc4918#section-9.8). Not safe, but idempotent."];
+    Delete            b"DELETE"            false true  #[doc = "`DELETE`, defined in [RFC 7231, section 4.3.5](https://tools.ietf.org/html/rfc7231#section-4.3.5). Not safe, but idempotent."];
+    Get               b"GET"               true  true  #[doc = "`GET`, defined in [RFC 7231, section 4.3.1](https://tools.ietf.org/html/rfc7231#section-4.3.1). Safe and idempotent."];
+    Head              b"HEAD"              true  true  #[doc = "`HEAD`, defined in [RFC 7231, section 4.3.2](https://tools.ietf.org/html/rfc7231#section-4.3.2). Safe and idempotent."];
+    Label             b"LABEL"             false true  #[doc = "`LABEL`, defined in [RFC 3253, section 8.2](https://tools.ietf.org/html/rfc3253#section-8.2). Not safe, but idempotent."];
+    Link              b"LINK"              false true  #[doc = "`LINK`, defined in [RFC 2068, section 19.6.1.2](https://tools.ietf.org/html/rfc2068#section-19.6.1.2). Not safe, but idempotent."];
+    Lock              b"LOCK"              false false #[doc = "`LOCK`, defined in [RFC 4918, section 9.10](https://tools.ietf.org/html/rfc4918#section-9.10). Not safe and not idempotent."];
+    Merge             b"MERGE"             false true  #[doc = "`MERGE`, defined in [RFC 3253, section 11.2](https://tools.ietf.org/html/rfc3253#section-11.2). Not safe, but idempotent."];
+    MkActivity        b"MKACTIVITY"        false true  #[doc = "`MKACTIVITY`, defined in [RFC 3253, section 13.5](https://tools.ietf.org/html/rfc3253#section-13.5). Not safe, but idempotent."];
+    MkCalendar        b"MKCALENDAR"        false true  #[doc = "`MKCALENDAR`, defined in [RFC 4791, section 5.3.1](https://tools.ietf.org/html/rfc4791#section-5.3.1). Not safe, but idempotent."];
+    MkCol             b"MKCOL"             false true  #[doc = "`MKCOL`, defined in [RFC 4918, section 9.3](https://tools.ietf.org/html/rfc4918#section-9.3). Not safe, but idempotent."];
+    MkRedirectRef     b"MKREDIRECTREF"     false true  #[doc = "`MKREDIRECTREF`, defined in [RFC 4437, section 6](https://tools.ietf.org/html/rfc4437#section-6). Not safe, but idempotent."];
+    MkWorkspace       b"MKWORKSPACE"       false true  #[doc = "`MKWORKSPACE`, defined in [RFC 3253, section 6.3](https://tools.ietf.org/html/rfc3253#section-6.3). Not safe, but idempotent."];
+    Move              b"MOVE"              false true  #[doc = "`MOVE`, defined in [RFC 4918, section 9.9](https://tools.ietf.org/html/rfc4918#section-9.9). Not safe, but idempotent."];
+    Options           b"OPTIONS"           true  true  #[doc = "`OPTIONS`, defined in [RFC 7231, section 4.3.7](https://tools.ietf.org/html/rfc7231#section-4.3.7). Safe and idempotent."];
+    OrderPatch        b"ORDERPATCH"        false true  #[doc = "`ORDERPATCH`, defined in [RFC 3648, section 7](https://tools.ietf.org/html/rfc3648#section-7). Not safe, but idempotent."];
+    Patch             b"PATCH"             false false #[doc = "`PATCH`, defined in [RFC 5789, section 2](https://tools.ietf.org/html/rfc5789#section-2). Not safe and not idempotent."];
+    Post              b"POST"              false false #[doc = "`POST`, defined in [RFC 7231, section 4.3.3](https://tools.ietf.org/html/rfc7231#section-4.3.3). Not safe and not idempotent."];
+    PropFind          b"PROPFIND"          true  true  #[doc = "`PROPFIND`, defined in [RFC 4918, section 9.1](https://tools.ietf.org/html/rfc4918#section-9.1). Safe and idempotent."];
+    PropPatch         b"PROPPATCH"         false true  #[doc = "`PROPPATCH`, defined in [RFC 4918, section 9.2](https://tools.ietf.org/html/rfc4918#section-9.2). Not safe, but idempotent."];
+    Put               b"PUT"               false true  #[doc = "`PUT`, defined in [RFC 7231, section 4.3.4](https://tools.ietf.org/html/rfc7231#section-4.3.4). Not safe, but idempotent."];
+    Rebind            b"REBIND"            false true  #[doc = "`REBIND`, defined in [RFC 5842, section 6](https://tools.ietf.org/html/rfc5842#section-6). Not safe, but idempotent."];
+    Report            b"REPORT"            true  true  #[doc = "`REPORT`, defined in [RFC 3253, section 3.6](https://tools.ietf.org/html/rfc3253#section-3.6). Safe and idempotent."];
+    Search            b"SEARCH"            true  true  #[doc = "`SEARCH`, defined in [RFC 5323, section 2](https://tools.ietf.org/html/rfc5323#section-2). Safe and idempotent."];
+    Trace             b"TRACE"             true  true  #[doc = "`TRACE`, defined in [RFC 7231, section 4.3.8](https://tools.ietf.org/html/rfc7231#section-4.3.8). Safe and idempotent."];
+    Unbind            b"UNBIND"            false true  #[doc = "`UNBIND`, defined in [RFC 5842, section 5](https://tools.ietf.org/html/rfc5842#section-5). Not safe, but idempotent."];
+    Uncheckout        b"UNCHECKOUT"        false true  #[doc = "`UNCHECKOUT`, defined in [RFC 3253, section 4.5](https://tools.ietf.org/html/rfc3253#section-4.5). Not safe, but idempotent."];
+    Unlink            b"UNLINK"            false true  #[doc = "`UNLINK`, defined in [RFC 2068, section 19.6.1.3](https://tools.ietf.org/html/rfc2068#section-19.6.1.3). Not safe, but idempotent."];
+    Unlock            b"UNLOCK"            false true  #[doc = "`UNLOCK`, defined in [RFC 4918, section 9.11](https://tools.ietf.org/html/rfc4918#section-9.11). Not safe, but idempotent."];
+    Update            b"UPDATE"            false true  #[doc = "`UPDATE`, defined in [RFC 3253, section 7.1](https://tools.ietf.org/html/rfc3253#section-7.1). Not safe, but idempotent."];
+    UpdateRedirectRef b"UPDATEREDIRECTREF" false true  #[doc = "`UPDATEREDIRECTREF`, defined in [RFC 4437, section 7](https://tools.ietf.org/html/rfc4437#section-7). Not safe, but idempotent."];
+    VersionControl    b"VERSION-CONTROL"   false true  #[doc = "`VERSION-CONTROL`, defined in [RFC 3253, section 3.5](https://tools.ietf.org/html/rfc3253#section-3.5). Not safe, but idempotent."];
 }
