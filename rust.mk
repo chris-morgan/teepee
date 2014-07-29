@@ -59,6 +59,9 @@ $(1): $$(LIB_$(1))
 
 $$(LIB_$(1)): $$(SRC_$(1)) $$(DEP_LIB_$(1))
 	@mkdir -p target/
+	@# Remove any cargo library to avoid having multiple matching crates.
+	@# This is a nasty workaround and should not be considered wise.
+	rm -f $$(subst .rlib,-*.rlib,$$(LIB_$(1)))
 	$$(RUSTC) $$(RUSTFLAGS) src/$(1)/lib.rs --out-dir=target -L target -L target/deps
 
 $(1)-docs: doc/$(1)/index.html
