@@ -153,7 +153,7 @@ impl<'a> Token<'a> {
     pub fn into_owned(self) -> Token<'static> {
         match self {
             Owned { _bytes } => Owned { _bytes: _bytes },
-            Slice { _bytes } => Owned { _bytes: _bytes.to_owned() },
+            Slice { _bytes } => Owned { _bytes: _bytes.to_vec() },
         }
     }
 
