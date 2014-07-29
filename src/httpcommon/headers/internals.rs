@@ -39,7 +39,7 @@ pub struct Item {
     raw: Option<Vec<Vec<u8>>>,
 
     /// A strongly typed header which has been parsed from the raw value.
-    typed: Option<Box<Header> + 'static>,
+    typed: Option<Box<Header + 'static>>,
 }
 
 impl Item {
@@ -60,7 +60,7 @@ impl Item {
         Item {
             raw_valid: false,
             raw: None,
-            typed: Some(box typed as Box<Header>),
+            typed: Some(box typed as Box<Header + 'static>),
         }
     }
 
@@ -132,8 +132,8 @@ impl Item {
                 let h: Option<H> = Header::parse_header(self.raw.get_ref().as_slice());
                 match h {
                     Some(h) => {
-                        self.typed = Some(box h as Box<Header>);
-                        Some(unsafe { self.typed.get_mut_ref().as_mut_unchecked::<H>() })
+                        self.typed = Some(box h as Box<Header + 'static>);
+                        Some(unsafe { self.typed.get_mut_ref().downcast_mut_unchecked::<H>() })
                     },
                     None => None,
                 }
@@ -142,7 +142,7 @@ impl Item {
                 if invalidate_raw {
                     self.raw_valid = false;
                 }
-                Some(unsafe { h.as_mut_unchecked::<H>() })
+                Some(unsafe { h.downcast_mut_unchecked::<H>() })
             },
             Some(ref mut h) => {
                 if !self.raw_valid {
@@ -162,8 +162,8 @@ impl Item {
                 let otyped: Option<H> = Header::parse_header(self.raw.get_ref().as_slice());
                 match otyped {
                     Some(typed) => {
-                        *h = box typed as Box<Header>;
-                        Some(unsafe { h.as_mut_unchecked::<H>() })
+                        *h = box typed as Box<Header + 'static>;
+                        Some(unsafe { h.downcast_mut_unchecked::<H>() })
                     },
                     None => None,
                 }
@@ -199,7 +199,7 @@ impl Item {
     /// This invalidates the typed representation.
     pub fn set_typed<'a, H: Header + 'static>(&mut self, value: H) {
         self.raw_valid = false;
-        self.typed = Some(box value as Box<Header>);
+        self.typed = Some(box value as Box<Header + 'static>);
     }
 }
 
@@ -280,8 +280,8 @@ mod tests {
         if item.typed.is_some() || other.typed.is_some() {
             let it = item.typed.get_ref();
             let ot = other.typed.get_ref();
-            let ir = it.as_ref::<H>().expect("assert_headers_eq: expected Some item, got None");
-            let or = ot.as_ref::<H>().expect("assert_headers_eq: expected Some other, got None");
+            let ir = it.downcast_ref::<H>().expect("assert_headers_eq: expected Some item, got None");
+            let or = ot.downcast_ref::<H>().expect("assert_headers_eq: expected Some other, got None");
             assert_eq!(ir, or);
         }
     }

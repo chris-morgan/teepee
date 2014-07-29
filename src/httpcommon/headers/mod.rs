@@ -1,6 +1,6 @@
 //! HTTP headers.
 
-use std::any::{Any, AnyRefExt};
+use std::any::{AnyRefExt};
 use std::mem::{transmute, transmute_copy};
 use std::intrinsics::TypeId;
 use std::fmt;
@@ -14,8 +14,18 @@ use self::internals::Item;
 
 mod internals;
 
+/// An inner trait to ensure that only this module can call `get_type_id()`.
+trait AnyPrivate {
+    /// Get the `TypeId` of `self`
+    fn get_type_id(&self) -> TypeId;
+}
+
+impl<T: 'static> AnyPrivate for T {
+    fn get_type_id(&self) -> TypeId { TypeId::of::<T>() }
+}
+
 /// The data type of an HTTP header for encoding and decoding.
-pub trait Header: Any {
+pub trait Header: AnyPrivate {
     /// Parse a header from one or more header field values, returning some value if successful or
     /// `None` if parsing fails.
     ///
@@ -48,9 +58,9 @@ impl<'a> AnyRefExt<'a> for &'a Header {
     }
 
     #[inline]
-    fn as_ref<T: 'static>(self) -> Option<&'a T> {
+    fn downcast_ref<T: 'static>(self) -> Option<&'a T> {
         if self.is::<T>() {
-            Some(unsafe { self.as_ref_unchecked() })
+            Some(unsafe { self.downcast_ref_unchecked() })
         } else {
             None
         }
@@ -61,12 +71,12 @@ impl<'a> AnyRefExt<'a> for &'a Header {
 trait UncheckedAnyRefExt<'a> {
     /// Returns a reference to the boxed value, assuming that it is of type `T`. This should only be
     /// called if you are ABSOLUTELY CERTAIN of `T` as you will get really wacky output if it’s not.
-    unsafe fn as_ref_unchecked<T: 'static>(self) -> &'a T;
+    unsafe fn downcast_ref_unchecked<T: 'static>(self) -> &'a T;
 }
 
 impl<'a> UncheckedAnyRefExt<'a> for &'a Header {
     #[inline]
-    unsafe fn as_ref_unchecked<T: 'static>(self) -> &'a T {
+    unsafe fn downcast_ref_unchecked<T: 'static>(self) -> &'a T {
         // Get the raw representation of the trait object
         let to: TraitObject = transmute_copy(&self);
 
@@ -79,12 +89,12 @@ impl<'a> UncheckedAnyRefExt<'a> for &'a Header {
 trait UncheckedAnyMutRefExt<'a> {
     /// Returns a reference to the boxed value, assuming that it is of type `T`. This should only be
     /// called if you are ABSOLUTELY CERTAIN of `T` as you will get really wacky output if it’s not.
-    unsafe fn as_mut_unchecked<T: 'static>(self) -> &'a mut T;
+    unsafe fn downcast_mut_unchecked<T: 'static>(self) -> &'a mut T;
 }
 
 impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
     #[inline]
-    unsafe fn as_mut_unchecked<T: 'static>(self) -> &'a mut T {
+    unsafe fn downcast_mut_unchecked<T: 'static>(self) -> &'a mut T {
         // Get the raw representation of the trait object
         let to: TraitObject = transmute_copy(&self);
 
@@ -153,8 +163,8 @@ pub trait HeaderMarker<OutputType: Header + 'static> {
     fn header_name(&self) -> SendStr;
 }
 
-impl Header for Box<Header> {
-    fn parse_header(_raw: &[Vec<u8>]) -> Option<Box<Header>> {
+impl Header for Box<Header + 'static> {
+    fn parse_header(_raw: &[Vec<u8>]) -> Option<Box<Header + 'static>> {
         // Dummy impl; XXX: split to ToHeader/FromHeader?
         None
     }
