@@ -227,7 +227,7 @@ mod tests {
         let item = Item {
             raw_valid: raw_valid,
             raw: raw,
-            typed: typed.map(|h| box h as Box<Header>),
+            typed: typed.map(|h| box h as Box<Header + 'static>),
         };
         item.assert_invariants();
         item
