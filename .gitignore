@@ -11,3 +11,4 @@ doc/*.js
 doc/*.css
 doc/*.woff
 doc/implementors/
+Cargo.lock
