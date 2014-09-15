@@ -44,7 +44,7 @@ pub trait Header: AnyPrivate {
 }
 
 // impl copied from std::any. Not especially nice, sorry :-(
-impl<'a> AnyRefExt<'a> for &'a Header {
+impl<'a> AnyRefExt<'a> for &'a Header + 'a {
     #[inline]
     fn is<T: 'static>(self) -> bool {
         // Get TypeId of the type this function is instantiated with
@@ -74,7 +74,7 @@ trait UncheckedAnyRefExt<'a> {
     unsafe fn downcast_ref_unchecked<T: 'static>(self) -> &'a T;
 }
 
-impl<'a> UncheckedAnyRefExt<'a> for &'a Header {
+impl<'a> UncheckedAnyRefExt<'a> for &'a Header + 'a {
     #[inline]
     unsafe fn downcast_ref_unchecked<T: 'static>(self) -> &'a T {
         // Get the raw representation of the trait object
@@ -92,7 +92,7 @@ trait UncheckedAnyMutRefExt<'a> {
     unsafe fn downcast_mut_unchecked<T: 'static>(self) -> &'a mut T;
 }
 
-impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
+impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header + 'a {
     #[inline]
     unsafe fn downcast_mut_unchecked<T: 'static>(self) -> &'a mut T {
         // Get the raw representation of the trait object
@@ -174,8 +174,8 @@ impl Header for Box<Header + 'static> {
     }
 }
 
-impl<'a> Header for &'a Header {
-    fn parse_header(_raw: &[Vec<u8>]) -> Option<&'a Header> {
+impl<'a> Header for &'a Header + 'a {
+    fn parse_header(_raw: &[Vec<u8>]) -> Option<&'a Header + 'a> {
         // Dummy impl; XXX: split to ToHeader/FromHeader?
         None
     }
@@ -385,7 +385,7 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
 
 /// An adapter which provides `std::fmt::Show` as equivalent to `Header.fmt_header`, so that you can
 /// actually *use* the thing.
-struct HeaderShowAdapter<'a, H>(pub &'a H);
+struct HeaderShowAdapter<'a, H: 'a>(pub &'a H);
 
 impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
     #[inline]
