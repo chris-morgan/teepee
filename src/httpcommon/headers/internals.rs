@@ -204,22 +204,21 @@ impl Item {
 }
 
 #[cfg(test)]
+impl Item {
+    fn assert_invariants(&self) {
+        assert!(self.raw.is_some() || !self.raw_valid);
+        assert!(self.raw.is_some() || self.typed.is_some());
+        assert!(!self.raw_valid || self.raw.get_ref().len() > 0);
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::Item;
     use super::super::Header;
     use std::fmt;
     use std::any::AnyRefExt;
     use std::io::IoResult;
-
-    // Until https://github.com/mozilla/rust/issues/9052 is fixed, the super:: is needed.
-    #[allow(unnecessary_qualification)]
-    impl super::Item {
-        fn assert_invariants(&self) {
-            assert!(self.raw.is_some() || !self.raw_valid);
-            assert!(self.raw.is_some() || self.typed.is_some());
-            assert!(!self.raw_valid || self.raw.get_ref().len() > 0);
-        }
-    }
 
     fn mkitem<H: Header + 'static>(raw_valid: bool,
                                    raw: Option<Vec<Vec<u8>>>,
