@@ -1,6 +1,6 @@
 //! HTTP headers.
 
-use std::any::{AnyRefExt};
+use std::any::{AnyRefExt, AnyPrivate};
 use std::mem::{transmute, transmute_copy};
 use std::intrinsics::TypeId;
 use std::fmt;
@@ -13,16 +13,6 @@ use std::collections::hashmap::HashMap;
 use self::internals::Item;
 
 mod internals;
-
-/// An inner trait to ensure that only this module can call `get_type_id()`.
-trait AnyPrivate {
-    /// Get the `TypeId` of `self`
-    fn get_type_id(&self) -> TypeId;
-}
-
-impl<T: 'static> AnyPrivate for T {
-    fn get_type_id(&self) -> TypeId { TypeId::of::<T>() }
-}
 
 /// The data type of an HTTP header for encoding and decoding.
 pub trait Header: AnyPrivate {
