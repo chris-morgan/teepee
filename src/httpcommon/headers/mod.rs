@@ -8,7 +8,7 @@ use std::io::{MemWriter, IoResult};
 use std::raw::TraitObject;
 use std::str::SendStr;
 
-use std::collections::hashmap::HashMap;
+use std::collections::hashmap::{HashMap, Occupied, Vacant};
 
 use self::internals::Item;
 
@@ -327,9 +327,10 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
 
     /// Set the named header to the given value.
     pub fn set(&mut self, header_marker: M, value: H) {
-        let _ = self.data.find_with_or_insert_with(header_marker.header_name(), value,
-                                                   |_k, item, value| item.set_typed(value),
-                                                   |_k, value| Item::from_typed(value));
+        match self.data.entry(header_marker.header_name()) {
+            Vacant(entry) => { let _ = entry.set(Item::from_typed(value)); },
+            Occupied(entry) => entry.into_mut().set_typed(value),
+        }
     }
 
     /// Get the raw values of a header, by name.
@@ -361,9 +362,10 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     /// This invalidates the typed representation.
     #[inline]
     pub fn set_raw(&mut self, header_marker: M, value: Vec<Vec<u8>>) {
-        let _ = self.data.find_with_or_insert_with(header_marker.header_name(), value,
-                                                   |_k, item, value| item.set_raw(value),
-                                                   |_k, value| Item::from_raw(value));
+        match self.data.entry(header_marker.header_name()) {
+            Vacant(entry) => { let _ = entry.set(Item::from_raw(value)); },
+            Occupied(entry) => entry.into_mut().set_raw(value),
+        }
     }
 
     /// Remove a header from the collection.
@@ -375,7 +377,7 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
 
 /// An adapter which provides `std::fmt::Show` as equivalent to `Header.fmt_header`, so that you can
 /// actually *use* the thing.
-struct HeaderShowAdapter<'a, H: 'a>(pub &'a H);
+pub struct HeaderShowAdapter<'a, H: 'a>(pub &'a H);
 
 impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
     #[inline]

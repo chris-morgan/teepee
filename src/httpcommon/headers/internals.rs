@@ -85,7 +85,7 @@ impl Item {
         if invalidate_typed {
             self.typed = None;
         }
-        self.raw.get_mut_ref()
+        self.raw.as_mut().unwrap()
     }
 
     /// Get a mutable reference to the raw representation of the header values.
@@ -129,11 +129,11 @@ impl Item {
                 if invalidate_raw {
                     self.raw_valid = false;
                 }
-                let h: Option<H> = Header::parse_header(self.raw.get_ref().as_slice());
+                let h: Option<H> = Header::parse_header(self.raw.as_ref().unwrap().as_slice());
                 match h {
                     Some(h) => {
                         self.typed = Some(box h as Box<Header + 'static>);
-                        Some(unsafe { self.typed.get_mut_ref().downcast_mut_unchecked::<H>() })
+                        Some(unsafe { self.typed.as_mut().unwrap().downcast_mut_unchecked::<H>() })
                     },
                     None => None,
                 }
@@ -159,7 +159,7 @@ impl Item {
                 } else if invalidate_raw {
                     self.raw_valid = false;
                 }
-                let otyped: Option<H> = Header::parse_header(self.raw.get_ref().as_slice());
+                let otyped: Option<H> = Header::parse_header(self.raw.as_ref().unwrap().as_slice());
                 match otyped {
                     Some(typed) => {
                         *h = box typed as Box<Header + 'static>;
@@ -208,7 +208,7 @@ impl Item {
     fn assert_invariants(&self) {
         assert!(self.raw.is_some() || !self.raw_valid);
         assert!(self.raw.is_some() || self.typed.is_some());
-        assert!(!self.raw_valid || self.raw.get_ref().len() > 0);
+        assert!(!self.raw_valid || self.raw.as_ref().unwrap().len() > 0);
     }
 }
 
@@ -277,8 +277,8 @@ mod tests {
         assert_eq!(item.raw_valid, other.raw_valid);
         assert_eq!(item.raw, other.raw);
         if item.typed.is_some() || other.typed.is_some() {
-            let it = item.typed.get_ref();
-            let ot = other.typed.get_ref();
+            let it = item.typed.as_ref().unwrap();
+            let ot = other.typed.as_ref().unwrap();
             let ir = it.downcast_ref::<H>().expect("assert_headers_eq: expected Some item, got None");
             let or = ot.downcast_ref::<H>().expect("assert_headers_eq: expected Some other, got None");
             assert_eq!(ir, or);
@@ -287,7 +287,7 @@ mod tests {
 
     // Dummy 1: multiple headers
     fn d1raw() -> Vec<Vec<u8>> {
-        vec![Vec::from_slice(b"ab"), Vec::from_slice(b"cd")]
+        vec![b"ab".to_vec(), b"cd".to_vec()]
         //vec![vec![b'a', b'b'], vec![b'c', b'd']]
     }
     fn d1st() -> StrongType { StrongType(d1raw()) }
@@ -295,7 +295,7 @@ mod tests {
 
     // Dummy 2: 1, but merged
     fn d2raw() -> Vec<Vec<u8>> {
-        vec![Vec::from_slice(b"ab, cd")]
+        vec![b"ab, cd".to_vec()]
         //vec![vec![b'a', b'b', b',', b' ', b'c', b'd']]
     }
     //fn d2st() -> StrongType { StrongType(d2raw()) }
@@ -303,7 +303,7 @@ mod tests {
 
     // Dummy 3: multiple headers, different from 1
     fn d3raw() -> Vec<Vec<u8>> {
-        vec![Vec::from_slice(b"12"), Vec::from_slice(b"34")]
+        vec![b"12".to_vec(), b"34".to_vec()]
         //vec![vec![b'1', b'2'], vec![b'3', b'4']]
     }
     fn d3st() -> StrongType { StrongType(d3raw()) }
@@ -311,7 +311,7 @@ mod tests {
 
     // Dummy 4: 3, but merged
     fn d4raw() -> Vec<Vec<u8>> {
-        vec![Vec::from_slice(b"12, 34")]
+        vec![b"12, 34".to_vec()]
         //vec![vec![b'1', b'2', b',', b' ', b'3', b'4']]
     }
     fn d4st() -> StrongType { StrongType(d4raw()) }
