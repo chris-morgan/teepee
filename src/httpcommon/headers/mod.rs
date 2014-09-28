@@ -160,7 +160,7 @@ impl Header for Box<Header + 'static> {
     }
 
     fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
-        self.fmt_header(w)
+        (**self).fmt_header(w)
     }
 }
 
@@ -171,7 +171,7 @@ impl<'a> Header for &'a Header + 'a {
     }
 
     fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
-        self.fmt_header(w)
+        (**self).fmt_header(w)
     }
 }
 
