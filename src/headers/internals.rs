@@ -6,6 +6,7 @@ use std::ops::Deref;
 use std::fmt;
 use std::mem;
 use std::slice;
+use std::str;
 
 use tendril::{ByteTendril, StrTendril};
 use smallvec::SmallVec;
@@ -13,17 +14,6 @@ use smallvec::SmallVec;
 use mucell::{MuCell, Ref};
 
 use super::{ToHeader, Header, HeaderDisplayAdapter};
-
-// Nothing even remotely fancy here like counting how many items,
-// because I don’t need it in my simple cases.
-macro_rules! smallvec {
-    [] => (SmallVec::new());
-    [$($x:expr),*] => {{
-        let mut _small_vec = SmallVec::new();
-        $(_small_vec.push($x);)*
-        _small_vec
-    }};
-}
 
 /// All the header field values, raw or typed, with a shared field name.
 ///
@@ -666,7 +656,8 @@ impl Item {
         let convert_if_necessary = self.inner.try_mutate(|inner| {
             let _ = inner.single_typed_mut::<H>(false);
         });
-        Ref::filter_map(self.inner.borrow(), |inner| inner.single_typed_cow(convert_if_necessary))
+        Ref::filter_map(self.inner.borrow(),
+                        move |inner| inner.single_typed_cow(convert_if_necessary))
     }
 
     /// Get a reference to the list-typed representation of the header values.
@@ -683,7 +674,8 @@ impl Item {
         let convert_if_necessary = self.inner.try_mutate(|inner| {
             let _ = inner.list_typed_mut::<H>(false);
         });
-        Ref::map(self.inner.borrow(), |inner| inner.list_typed_cow(convert_if_necessary))
+        Ref::map(self.inner.borrow(),
+                 move |inner| inner.list_typed_cow(convert_if_necessary))
     }
 
     /// Set the typed form of the header as a single-type.
@@ -702,6 +694,19 @@ impl Item {
         let inner = self.inner.borrow_mut();
         inner.raw = None;
         inner.typed = Typed::List(Box::new(value));
+    }
+
+    /// Produce an object that will iterate over objects satisfying `fmt::Display` for each value
+    /// of the header.
+    pub fn formatter(&self) -> Ref<ItemFormatter> {
+        Ref::map(self.inner.borrow(), |inner| match *inner {
+            Inner { raw: Some(ref lines), .. } => ItemFormatter::Raw(lines.iter()),
+            Inner { raw: None, typed: Typed::None } => ItemFormatter::Raw([].iter()),
+            Inner { typed: Typed::Single(ref header), .. } =>
+                ItemFormatter::TypedSingle(Some(&**header)),
+            Inner { typed: Typed::List(ref header), .. } =>
+                ItemFormatter::TypedList(Some(&**header)),
+        })
     }
 }
 
@@ -742,6 +747,52 @@ impl<'a, T: ToHeader + Header + Clone> GetMut<'a> for Option<&'a mut T> {
 impl<'a, T: ToHeader + Header + Clone> GetMut<'a> for &'a mut Vec<T> {
     fn get_mut(entry: hash_map::Entry<'a, StrTendril, Item>) -> Self {
         entry.or_insert_with(|| Item::from_list_typed::<T>(vec![])).list_typed_mut()
+    }
+}
+
+/// The result of `Item.formatter()`.
+///
+/// Iteration is the only useful thing that can be done on this. It will normally yield one element
+/// only, but may yield more than one.
+pub enum ItemFormatter<'a> {
+    Raw(slice::Iter<'a, ByteTendril>),
+    TypedSingle(Option<&'a (Header + 'static)>),
+    TypedList(Option<&'a (ListHeader + 'static)>),
+}
+
+/// The result of iteration over `ItemFormatter`.
+///
+/// This is fit only for invoking `fmt::Display` on.
+pub enum LineFormatter<'a> {
+    Raw(&'a [u8]),
+    TypedSingle(&'a (Header + 'static)),
+    TypedList(&'a (ListHeader + 'static)),
+}
+
+impl<'a> Iterator for ItemFormatter<'a> {
+    type Item = LineFormatter<'a>;
+
+    fn next(&mut self) -> Option<LineFormatter<'a>> {
+        match *self {
+            ItemFormatter::Raw(ref mut iter) => iter.next().map(|v| LineFormatter::Raw(v)),
+            ItemFormatter::TypedSingle(ref mut header) =>
+                header.take().map(|h| LineFormatter::TypedSingle(h)),
+            ItemFormatter::TypedList(ref mut header) =>
+                header.take().map(|h| LineFormatter::TypedList(h)),
+        }
+    }
+}
+
+impl<'a> fmt::Display for LineFormatter<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            // TODO: I feel guilty about this underhanded insertion of potentially non-UTF-8 data
+            // into a formatter. I should really do something about it, though I’m not altogether
+            // sure what.
+            LineFormatter::Raw(slice) => f.write_str(unsafe { str::from_utf8_unchecked(slice) }),
+            LineFormatter::TypedSingle(header) => header.fmt(f),
+            LineFormatter::TypedList(header) => header.fmt(f),
+        }
     }
 }
 

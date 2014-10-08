@@ -12,6 +12,9 @@
 extern crate phf;
 
 #[macro_use]
+extern crate phantom_enum;
+
+#[macro_use]
 extern crate mucell;
 
 #[macro_use]
@@ -24,3 +27,8 @@ pub mod method;
 pub mod status;
 pub mod headers;
 pub mod grammar;
+pub mod httpt;
+pub mod http1;
+
+#[cfg(test)]
+pub mod test_utils;

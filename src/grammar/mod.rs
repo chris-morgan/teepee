@@ -3,3 +3,4 @@
 //! These are mostly implementation details that you shouldn’t need to worry about.
 
 pub mod token;
+pub mod core;

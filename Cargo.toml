@@ -11,9 +11,10 @@ keywords = ["web", "http", "library"]
 license = "MIT/Apache-2.0"
 
 [dependencies]
-mucell = "0.3.2"
+mucell = "0.3.4"
 phf = "*"
 phf_macros = "*"
 mopa = "*"
 tendril = {version = "*", git = "https://github.com/chris-morgan/tendril", branch = "impl-borrow-for-tendril"}
 smallvec = "*"
+phantom-enum = "*"

@@ -2,8 +2,10 @@
 
 use std::any::TypeId;
 use mopa::Any;
-use std::fmt;
 use std::borrow::Cow;
+use std::collections::hash_map;
+use std::fmt;
+use std::iter;
 use std::mem;
 
 use std::collections::hash_map::HashMap;
@@ -15,6 +17,17 @@ use smallvec::SmallVec;
 use self::internals::Item;
 pub use mucell::Ref;
 pub use self::internals::TypedListRef;
+
+// Nothing even remotely fancy here like counting how many items,
+// because I don’t need it in my simple cases.
+macro_rules! smallvec {
+    [] => (SmallVec::new());
+    [$($x:expr),*] => {{
+        let mut _small_vec = SmallVec::new();
+        $(_small_vec.push($x);)*
+        _small_vec
+    }};
+}
 
 mod internals;
 mod implementations;
@@ -461,11 +474,46 @@ pub struct Headers {
     data: HashMap<StrTendril, Item>,
 }
 
+impl fmt::Display for Headers {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (name, values) in self.data.iter() {
+            try!(unsafe { Ref::map_unsafe(values.formatter(), |iter| {
+                for value in iter {
+                    try!(write!(f, "{}: {}\n", name, value));
+                }
+                Ok(())
+            }) }.into_inner())
+        }
+        Ok(())
+    }
+}
+
 impl Headers {
     /// Construct a new header collection.
     pub fn new() -> Headers {
         Headers {
             data: HashMap::new(),
+        }
+    }
+
+    /// Iterates over `(&str, &[ByteTendril])` pairs.
+    pub fn iter_raw(&mut self) -> iter::Map<hash_map::IterMut<StrTendril, Item>,
+                                            for<'a> fn((&'a StrTendril, &'a mut Item))
+                                                    -> (&'a str, &'a [ByteTendril])> {
+        fn map<'a>((name, item): (&'a StrTendril, &'a mut Item)) -> (&'a str, &'a [ByteTendril]) {
+            (name, item.raw_mut())
+        }
+
+        self.data.iter_mut().map(map)
+    }
+
+    /// Insert a raw header field pair into the header set.
+    ///
+    /// This is largely just a convenience for HTTP message parsing.
+    pub fn insert_raw_line(&mut self, name: StrTendril, value: ByteTendril) {
+        match self.data.entry(name) {
+            Vacant(entry) => { let _ = entry.insert(Item::from_raw(smallvec![value])); },
+            Occupied(entry) => entry.into_mut().raw_mut().push(value),
         }
     }
 
