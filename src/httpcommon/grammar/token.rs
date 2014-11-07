@@ -69,14 +69,14 @@ impl<'a> fmt::Show for Token<'a> {
 impl<'a> PartialOrd for Token<'a> {
     #[inline]
     fn partial_cmp(&self, other: &Token<'a>) -> Option<Ordering> {
-        self.as_bytes().partial_cmp(&other.as_bytes())
+        self.as_bytes().partial_cmp(other.as_bytes())
     }
 }
 
 impl<'a> Ord for Token<'a> {
     #[inline]
     fn cmp(&self, other: &Token<'a>) -> Ordering {
-        self.as_bytes().cmp(&other.as_bytes())
+        self.as_bytes().cmp(other.as_bytes())
     }
 }
 
@@ -89,10 +89,15 @@ impl<'a> PartialEq for Token<'a> {
 
 impl<'a> Eq for Token<'a> { }
 
-impl<'a> Collection for Token<'a> {
+impl<'a> Token<'a> {
     #[inline]
-    fn len(&self) -> uint {
+    pub fn len(&self) -> uint {
         self.as_bytes().len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 

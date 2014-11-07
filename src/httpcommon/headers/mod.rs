@@ -1,6 +1,6 @@
 //! HTTP headers.
 
-use std::any::{AnyRefExt, AnyPrivate};
+use std::any::{AnyRefExt, Any};
 use std::mem::{transmute, transmute_copy};
 use std::intrinsics::TypeId;
 use std::fmt;
@@ -8,14 +8,14 @@ use std::io::{MemWriter, IoResult};
 use std::raw::TraitObject;
 use std::str::SendStr;
 
-use std::collections::hashmap::{HashMap, Occupied, Vacant};
+use std::collections::hash_map::{HashMap, Occupied, Vacant};
 
 use self::internals::Item;
 
 mod internals;
 
 /// The data type of an HTTP header for encoding and decoding.
-pub trait Header: AnyPrivate {
+pub trait Header: Any {
     /// Parse a header from one or more header field values, returning some value if successful or
     /// `None` if parsing fails.
     ///
@@ -164,8 +164,8 @@ impl Header for Box<Header + 'static> {
     }
 }
 
-impl<'a> Header for &'a Header + 'a {
-    fn parse_header(_raw: &[Vec<u8>]) -> Option<&'a Header + 'a> {
+impl<'a> Header for &'static Header + 'static {
+    fn parse_header(_raw: &[Vec<u8>]) -> Option<&'static Header + 'static> {
         // Dummy impl; XXX: split to ToHeader/FromHeader?
         None
     }

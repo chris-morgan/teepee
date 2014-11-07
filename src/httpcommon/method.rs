@@ -4,7 +4,7 @@
 use std::fmt;
 use std::mem;
 
-use phf::PhfMap;
+use phf::Map;
 
 use grammar::token;
 use grammar::token::Token;
@@ -17,7 +17,7 @@ macro_rules! method_enum {
         $idempotent:ident
         #[$doc:meta];
     )*) => {
-        static REGISTERED_METHODS: PhfMap<&'static [u8], Method<'static>> = phf_map!(
+        static REGISTERED_METHODS: Map<&'static [u8], Method<'static>> = phf_map!(
             $($bytes => $ident,)*
         );
 
@@ -98,7 +98,7 @@ macro_rules! method_enum {
             ///
             /// See also `registered_from_token`.
             pub fn from_token<'a>(token: Token<'a>) -> Method<'a> {
-                match REGISTERED_METHODS.find_equiv(&token.as_bytes()) {
+                match REGISTERED_METHODS.find_equiv(token.as_bytes()) {
                     Some(registered_token) => registered_token.clone(),
                     None => UnregisteredMethod {
                         name: token,
@@ -134,7 +134,7 @@ macro_rules! method_enum {
             ///
             /// See also `from_token`.
             pub fn registered_from_token(token: Token) -> Option<Method<'static>> {
-                REGISTERED_METHODS.find_equiv(&token.as_bytes()).map(|t| t.clone())
+                REGISTERED_METHODS.find_equiv(token.as_bytes()).map(|t| t.clone())
             }
 
             /// Change a slice-token-based method to use an owned-token.
@@ -296,10 +296,15 @@ macro_rules! method_enum {
 
         impl<'a> Eq for Method<'a> { }
 
-        impl<'a> Collection for Method<'a> {
+        impl<'a> Method<'a> {
             #[inline]
-            fn len(&self) -> uint {
+            pub fn len(&self) -> uint {
                 self.name().len()
+            }
+
+            #[inline]
+            pub fn is_empty(&self) -> bool {
+                self.len() == 0
             }
         }
 
@@ -311,11 +316,6 @@ macro_rules! method_enum {
     }
 }
 
-// FIXME(Chris): this is pretty absurd just at present. Especially the duplication between string
-// and bytes, for PHF. Ideally I should come up with a way to fix it all up so that all we need is
-// the variant name, bytes, safe, idempotent and RFC numbers/sections, probably by a procedural
-// macro. Making phf cope with byte literals would help too, and sfackler has said he would accept
-// a change from PhfMap<V> to PhfMap<K, V>.
 method_enum! {
     // Variant name   method name bytes    safe  idempotent
     Acl               b"ACL"               false true  #[doc = "`ACL`, defined in [RFC 3744, section 8.1](https://tools.ietf.org/html/rfc3744#section-8.1). Not safe, but idempotent."];
