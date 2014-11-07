@@ -301,11 +301,6 @@ macro_rules! method_enum {
             pub fn len(&self) -> uint {
                 self.name().len()
             }
-
-            #[inline]
-            pub fn is_empty(&self) -> bool {
-                self.len() == 0
-            }
         }
 
         impl<'a> fmt::Show for Method<'a> {
