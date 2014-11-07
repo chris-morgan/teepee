@@ -315,14 +315,14 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
     pub fn get_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a H> {
-        self.data.find_mut(&header_marker.header_name()).and_then(|item| item.typed_ref())
+        self.data.get_mut(&header_marker.header_name()).and_then(|item| item.typed_ref())
     }
 
     /// Get a mutable reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
     pub fn get_mut_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a mut H> {
-        self.data.find_mut(&header_marker.header_name()).and_then(|item| item.typed_mut_ref())
+        self.data.get_mut(&header_marker.header_name()).and_then(|item| item.typed_mut_ref())
     }
 
     /// Set the named header to the given value.
@@ -346,7 +346,7 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     /// The returned value is a slice of each header field value.
     #[inline]
     pub fn get_raw_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a [Vec<u8>]> {
-        self.data.find_mut(&header_marker.header_name()).map(|item| item.raw_ref().as_slice())
+        self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_ref().as_slice())
     }
 
     /// Get a mutable reference to the raw values of a header, by name.
@@ -354,7 +354,7 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     /// The returned vector contains each header field value.
     #[inline]
     pub fn get_raw_mut_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a mut Vec<Vec<u8>>> {
-        self.data.find_mut(&header_marker.header_name()).map(|item| item.raw_mut_ref())
+        self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_mut_ref())
     }
 
     /// Set the raw value of a header, by name.
@@ -370,8 +370,8 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
 
     /// Remove a header from the collection.
     /// Returns true if the named header was present.
-    pub fn remove(&mut self, header_marker: &M) {
-        self.data.remove(&header_marker.header_name());
+    pub fn remove(&mut self, header_marker: &M) -> bool {
+        self.data.remove(&header_marker.header_name()).is_some()
     }
 }
 

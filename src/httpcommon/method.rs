@@ -297,6 +297,7 @@ macro_rules! method_enum {
         impl<'a> Eq for Method<'a> { }
 
         impl<'a> Method<'a> {
+            /// Returns the length of the method name.
             #[inline]
             pub fn len(&self) -> uint {
                 self.name().len()

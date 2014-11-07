@@ -90,11 +90,13 @@ impl<'a> PartialEq for Token<'a> {
 impl<'a> Eq for Token<'a> { }
 
 impl<'a> Token<'a> {
+    /// The number of bytes in the token.
     #[inline]
     pub fn len(&self) -> uint {
         self.as_bytes().len()
     }
 
+    /// Whether the token is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
