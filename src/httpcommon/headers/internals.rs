@@ -369,7 +369,7 @@ mod tests {
         (
             $fn_name:ident =>
             ($s1:tt, $s2:tt, $s3a:tt $s3b:ident)
-            $method:ident ( $(,$args:expr)* ) / $T:ty
+            $method:ident ( $(,$args:expr)* ) / $T:ident
             ($e1:tt, $e2:tt, $e3a:tt $e3b:ident)
         ) => {
             #[test]
