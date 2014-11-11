@@ -182,3 +182,9 @@ impl<'a> Token<'a> {
         }
     }
 }
+
+impl<'a> Deref<str> for Token<'a> {
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
