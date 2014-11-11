@@ -314,14 +314,14 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     /// problem, by immediately cloning the header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a H> {
+    pub fn get_ref(&mut self, header_marker: M) -> Option<&H> {
         self.data.get_mut(&header_marker.header_name()).and_then(|item| item.typed_ref())
     }
 
     /// Get a mutable reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get_mut_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a mut H> {
+    pub fn get_mut_ref(&mut self, header_marker: M) -> Option<&mut H> {
         self.data.get_mut(&header_marker.header_name()).and_then(|item| item.typed_mut_ref())
     }
 
@@ -345,7 +345,7 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     ///
     /// The returned value is a slice of each header field value.
     #[inline]
-    pub fn get_raw_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a [Vec<u8>]> {
+    pub fn get_raw_ref(&mut self, header_marker: M) -> Option<&[Vec<u8>]> {
         self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_ref().as_slice())
     }
 
@@ -353,7 +353,7 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     ///
     /// The returned vector contains each header field value.
     #[inline]
-    pub fn get_raw_mut_ref<'a>(&'a mut self, header_marker: M) -> Option<&'a mut Vec<Vec<u8>>> {
+    pub fn get_raw_mut_ref(&mut self, header_marker: M) -> Option<&mut Vec<Vec<u8>>> {
         self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_mut_ref())
     }
 

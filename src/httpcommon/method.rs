@@ -97,7 +97,7 @@ macro_rules! method_enum {
             /// a new variant `Panic` instead of an `UnregisteredMethod`.
             ///
             /// See also `registered_from_token`.
-            pub fn from_token<'a>(token: Token<'a>) -> Method<'a> {
+            pub fn from_token(token: Token) -> Method {
                 match REGISTERED_METHODS.find_equiv(token.as_bytes()) {
                     Some(registered_token) => registered_token.clone(),
                     None => UnregisteredMethod {
@@ -160,7 +160,7 @@ macro_rules! method_enum {
             ///
             /// Where feasible you should avoid using this; compare against known values instead,
             /// or use `safe()` and `idempotent()` where feasible.
-            pub fn name<'b>(&'b self) -> Token<'b> {
+            pub fn name(&self) -> Token {
                 match *self {
                     $($ident => token::Slice { _bytes: $bytes },)*
                     UnregisteredMethod { ref name, .. } => name.slice(),

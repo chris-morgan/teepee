@@ -64,7 +64,7 @@ impl Item {
         }
     }
 
-    fn raw_mut_ref_internal<'a>(&'a mut self, invalidate_typed: bool) -> &'a mut Vec<Vec<u8>> {
+    fn raw_mut_ref_internal(&mut self, invalidate_typed: bool) -> &mut Vec<Vec<u8>> {
         if self.raw_valid == true {
             // All is good; we'll return the value in good time.
         } else {
@@ -95,7 +95,7 @@ impl Item {
     /// fashion, it will be parsed from the raw form.
     ///
     /// Only use this if you need to mutate the raw form; if you don't, use `raw_ref`.
-    pub fn raw_mut_ref<'a>(&'a mut self) -> &'a mut Vec<Vec<u8>> {
+    pub fn raw_mut_ref(&mut self) -> &mut Vec<Vec<u8>> {
         self.raw_mut_ref_internal(true)
     }
 
@@ -107,7 +107,7 @@ impl Item {
     /// reference.
     ///
     /// See also `raw_mut_ref`, if you wish to mutate the raw representation.
-    pub fn raw_ref<'a>(&'a mut self) -> &'a Vec<Vec<u8>> {
+    pub fn raw_ref(&mut self) -> &Vec<Vec<u8>> {
         &*self.raw_mut_ref_internal(false)
     }
 
@@ -120,8 +120,8 @@ impl Item {
         self.typed = None;
     }
 
-    fn typed_mut_ref_internal<'a, H: Header + 'static>
-                             (&'a mut self, invalidate_raw: bool) -> Option<&'a mut H> {
+    fn typed_mut_ref_internal<H: Header + 'static>
+                             (&mut self, invalidate_raw: bool) -> Option<&mut H> {
         match self.typed {
             None => {
                 debug_assert_eq!(self.raw_valid, true);
@@ -178,7 +178,7 @@ impl Item {
     /// fashion, it will be produced from the typed form.
     ///
     /// Only use this if you need to mutate the typed form; if you don't, use `typed_ref`.
-    pub fn typed_mut_ref<'a, H: Header + 'static>(&'a mut self) -> Option<&'a mut H> {
+    pub fn typed_mut_ref<H: Header + 'static>(&mut self) -> Option<&mut H> {
         self.typed_mut_ref_internal(true)
     }
 
@@ -190,14 +190,14 @@ impl Item {
     /// reference.
     ///
     /// See also `typed_mut_ref`, if you wish to mutate the typed representation.
-    pub fn typed_ref<'a, H: Header + 'static>(&'a mut self) -> Option<&'a H> {
+    pub fn typed_ref<H: Header + 'static>(&mut self) -> Option<&H> {
         self.typed_mut_ref_internal(false).map(|h| &*h)
     }
 
     /// Set the typed form of the header.
     ///
     /// This invalidates the raw representation.
-    pub fn set_typed<'a, H: Header + 'static>(&mut self, value: H) {
+    pub fn set_typed<H: Header + 'static>(&mut self, value: H) {
         self.raw_valid = false;
         self.typed = Some(box value as Box<Header + 'static>);
     }

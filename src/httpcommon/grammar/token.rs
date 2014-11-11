@@ -130,7 +130,7 @@ impl<'a> Token<'a> {
     /// Create a `Token` from a sequence of bytes.
     ///
     /// Returns `None` if not every byte in the slice is a RFC 7230 `tchar`.
-    pub fn from_slice(slice: &'a [u8]) -> Option<Token<'a>> {
+    pub fn from_slice(slice: &[u8]) -> Option<Token> {
         if slice.iter().all(|&c| is_tchar(c)) {
             Some(Slice { _bytes: slice })
         } else {
@@ -141,7 +141,7 @@ impl<'a> Token<'a> {
     /// Create a `Token` from a sequence of bytes, without checking it.
     ///
     /// Be very careful calling this.
-    pub unsafe fn from_slice_nocheck(slice: &'a [u8]) -> Token<'a> {
+    pub unsafe fn from_slice_nocheck(slice: &[u8]) -> Token {
         Slice { _bytes: slice }
     }
 
@@ -149,7 +149,7 @@ impl<'a> Token<'a> {
     ///
     /// This is practically a free operation.
     #[inline]
-    pub fn slice<'b>(&'b self) -> Token<'b> {
+    pub fn slice(&self) -> Token {
         Slice { _bytes: self.as_bytes() }
     }
 
@@ -166,7 +166,7 @@ impl<'a> Token<'a> {
 
     /// Get a string slice of the contents of the token.
     #[inline]
-    pub fn as_str<'b>(&'b self) -> &'b str {
+    pub fn as_str(&self) -> &str {
         // `token` is a subset of ASCII, so this cannot produce invalid data.
         unsafe {
             str::raw::from_utf8(self.as_bytes())
@@ -175,7 +175,7 @@ impl<'a> Token<'a> {
 
     /// Get a slice of the bytes in the token.
     #[inline]
-    pub fn as_bytes<'b>(&'b self) -> &'b [u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         match *self {
             Owned { ref _bytes } => _bytes.as_slice(),
             Slice { ref _bytes } => _bytes.as_slice(),
