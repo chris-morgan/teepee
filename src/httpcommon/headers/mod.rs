@@ -284,6 +284,7 @@ impl<'a> Header for &'static Header + 'static {
 /// rather than `Vec<u8>` each header field can 
 /// Each header name is thus associated with an
 /// item.
+#[deriving(PartialEq)]
 pub struct Headers {
     data: HashMap<SendStr, Item>,
 }

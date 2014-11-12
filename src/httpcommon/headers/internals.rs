@@ -42,6 +42,32 @@ pub struct Item {
     typed: Option<Box<Header + 'static>>,
 }
 
+impl PartialEq for Item {
+    fn eq(&self, other: &Item) -> bool {
+        match (self, other) {
+            (&Item { raw_valid: true, raw: Some(ref self_v), .. },
+             &Item { raw_valid: true, raw: Some(ref other_v), .. }) => self_v == other_v,
+
+            (&Item { raw_valid: true, raw: Some(ref self_v), .. },
+             &Item { typed: Some(ref other_h), .. }) => match self_v[] {
+                [ref self_v_line] => self_v_line == &fmt_header(other_h),
+                _ => false,
+            },
+
+            (&Item { typed: Some(ref self_h), .. },
+             &Item { raw_valid: true, raw: Some(ref other_v), .. }) => match other_v[] {
+                [ref other_v_line] => other_v_line == &fmt_header(self_h),
+                _ => false,
+            },
+
+            (&Item { typed: Some(ref self_h), .. },
+             &Item { typed: Some(ref other_h), .. }) => fmt_header(self_h) == fmt_header(other_h),
+
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl Item {
     /// Construct a new Item from a raw representation.
     ///
@@ -377,6 +403,7 @@ mod tests {
                 let mut item = _item!($s1, $s2, $s3a $s3b);
                 let _ = item.$method::<$T>($($args),*);
                 assert_headers_eq::<StrongType>(&item, &_item!($e1, $e2, $e3a $e3b));
+                assert!(item == _item!($e1, $e2, $e3a $e3b));
             }
         }
     }
@@ -428,4 +455,69 @@ mod tests {
     t!(typed_ref_with_other_np                 => (f, -, 3st) typed_ref()/np     (t, 4, 3st))
     t!(typed_ref_with_other_and_invalid_np     => (f, 1, 3st) typed_ref()/np     (t, 4, 3st))
     t!(typed_ref_with_other_and_raw_np         => (t, 1, 3st) typed_ref()/np     (t, 1, 3st))
+
+    macro_rules! fmtitem {
+        ($e:expr) => {{
+            let item = $e;
+            format!("Item {{ raw_valid: {}, raw: {}, typed: {} }}", item.raw_valid, item.raw,
+                    item.typed.map(|t| super::super::fmt_header(&t)))
+        }}
+    }
+
+    macro_rules! eq {
+        (
+            $fn_name:ident =>
+            ($s1:tt, $s2:tt, $s3a:tt $s3b:ident)
+            ($e1:tt, $e2:tt, $e3a:tt $e3b:ident)
+        ) => {
+            #[test]
+            fn $fn_name() {
+                //assert_eq!(_item!($s1, $s2, $s3a $s3b), _item!($e1, $e2, $e3a $e3b));
+                let a = _item!($s1, $s2, $s3a $s3b);
+                let b = _item!($e1, $e2, $e3a $e3b);
+                assert!(a == b, "The two are not equal!\n{}\n{}", fmtitem!(a), fmtitem!(b))
+            }
+        }
+    }
+
+    macro_rules! ne {
+        (
+            $fn_name:ident =>
+            ($s1:tt, $s2:tt, $s3a:tt $s3b:ident)
+            ($e1:tt, $e2:tt, $e3a:tt $e3b:ident)
+        ) => {
+            #[test]
+            fn $fn_name() {
+                let a = _item!($s1, $s2, $s3a $s3b);
+                let b = _item!($e1, $e2, $e3a $e3b);
+                assert!(a != b, "The two are equal!\n{}\n{}", fmtitem!(a), fmtitem!(b))
+            }
+        }
+    }
+
+    // raw = raw
+    eq!(raw_eq_raw_with_different_typed => (t, 2, 1st) (t, 2, 1np))
+    eq!(raw_eq_raw_with_same_typed      => (t, 2, 1st) (t, 2, 1st))
+    eq!(raw_eq_raw_with_one_typed       => (t, 2, 1st) (t, 2, -st))
+    eq!(raw_eq_raw_with_neither_typed   => (t, 2, -st) (t, 2, -st))
+    ne!(raw_ne_raw_with_different_typed => (t, 2, 1st) (t, 4, 3np))
+    ne!(raw_ne_raw_with_same_typed      => (t, 2, 1st) (t, 4, 3st))
+    ne!(raw_ne_raw_with_one_typed       => (t, 2, 1st) (t, 4, -st))
+    ne!(raw_ne_raw_with_neither_typed   => (t, 2, -st) (t, 4, -st))
+
+    // raw = typed
+    eq!(raw_eq_typed_with_one_raw         => (t, 2, 3st) (f, -, 1st))
+    ne!(raw_ne_typed_with_one_raw         => (t, 1, 1st) (f, -, 1st))
+    eq!(raw_eq_typed_with_invalid_raw     => (t, 2, 3st) (f, 3, 1st))
+    eq!(raw_eq_typed_with_different_typed => (t, 2, 1st) (f, -, 1np))
+
+    // typed = typed
+    eq!(typed_eq_typed_with_1              => (f, -, 1st) (f, -, 1np))
+    eq!(typed_eq_typed_with_2              => (f, -, 1st) (f, -, 1st))
+    eq!(typed_eq_typed_with_3              => (f, -, 1st) (f, 2, 1np))
+    eq!(typed_eq_typed_with_4              => (f, -, 1st) (f, 2, 1st))
+    eq!(typed_eq_typed_with_5              => (f, 2, 1st) (f, -, 1np))
+    eq!(typed_eq_typed_with_6              => (f, 2, 1st) (f, -, 1st))
+    eq!(typed_eq_typed_with_7              => (f, 2, 1st) (f, 2, 1np))
+    eq!(typed_eq_typed_with_8              => (f, 2, 1st) (f, 2, 1st))
 }
