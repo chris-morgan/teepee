@@ -107,8 +107,8 @@ impl Item {
     /// reference.
     ///
     /// See also `raw_mut_ref`, if you wish to mutate the raw representation.
-    pub fn raw_ref(&mut self) -> &Vec<Vec<u8>> {
-        &*self.raw_mut_ref_internal(false)
+    pub fn raw_ref(&mut self) -> &[Vec<u8>] {
+        self.raw_mut_ref_internal(false).as_slice()
     }
 
     /// Set the raw form of the header.

@@ -346,7 +346,7 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     /// The returned value is a slice of each header field value.
     #[inline]
     pub fn get_raw_ref(&mut self, header_marker: M) -> Option<&[Vec<u8>]> {
-        self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_ref().as_slice())
+        self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_ref())
     }
 
     /// Get a mutable reference to the raw values of a header, by name.
