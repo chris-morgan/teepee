@@ -24,6 +24,7 @@
 
 use std::fmt;
 use std::str;
+use self::Token::{Owned, Slice};
 
 /// tchar: a token character; any VCHAR, except delimiters.
 #[inline]
@@ -47,13 +48,13 @@ pub enum Token<'a> {
     #[doc(hidden)]
     Owned {
         #[doc(hidden)]
-        pub _bytes: Vec<u8>,
+        _bytes: Vec<u8>,
     },
     /// A token backed by a slice (`&[u8]`).
     #[doc(hidden)]
     Slice {
         #[doc(hidden)]
-        pub _bytes: &'a [u8],
+        _bytes: &'a [u8],
     },
 }
 

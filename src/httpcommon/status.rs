@@ -4,6 +4,9 @@ use std::cmp::{PartialEq, Eq, PartialOrd, Ord};
 use std::fmt;
 use std::mem::transmute;
 
+pub use self::StatusCode::*;
+pub use self::StatusClass::*;
+
 /// An HTTP status code (`Status-Code` in RFC 2616).
 ///
 /// This enum is absolutely exhaustive, covering all 500 possible values (100–599).

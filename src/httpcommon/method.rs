@@ -6,8 +6,9 @@ use std::mem;
 
 use phf::Map;
 
-use grammar::token;
 use grammar::token::Token;
+
+pub use self::Method::*;
 
 macro_rules! method_enum {
     ($(
@@ -53,11 +54,11 @@ macro_rules! method_enum {
             /// A method not in the IANA HTTP method registry.
             UnregisteredMethod {
                 /// The method name.
-                pub name: Token<'a>,
+                name: Token<'a>,
                 /// Whether the method is safe or not.
-                pub safe: bool,
+                safe: bool,
                 /// Whether the method is idempotent or not.
-                pub idempotent: bool,
+                idempotent: bool,
             },
         }
 
@@ -98,7 +99,7 @@ macro_rules! method_enum {
             ///
             /// See also `registered_from_token`.
             pub fn from_token(token: Token) -> Method {
-                match REGISTERED_METHODS.find_equiv(token.as_bytes()) {
+                match REGISTERED_METHODS.get_equiv(token.as_bytes()) {
                     Some(registered_token) => registered_token.clone(),
                     None => UnregisteredMethod {
                         name: token,
@@ -134,7 +135,7 @@ macro_rules! method_enum {
             ///
             /// See also `from_token`.
             pub fn registered_from_token(token: Token) -> Option<Method<'static>> {
-                REGISTERED_METHODS.find_equiv(token.as_bytes()).map(|t| t.clone())
+                REGISTERED_METHODS.get_equiv(token.as_bytes()).map(|t| t.clone())
             }
 
             /// Change a slice-token-based method to use an owned-token.
@@ -162,7 +163,7 @@ macro_rules! method_enum {
             /// or use `safe()` and `idempotent()` where feasible.
             pub fn name(&self) -> Token {
                 match *self {
-                    $($ident => token::Slice { _bytes: $bytes },)*
+                    $($ident => Token::Slice { _bytes: $bytes },)*
                     UnregisteredMethod { ref name, .. } => name.slice(),
                 }
             }
