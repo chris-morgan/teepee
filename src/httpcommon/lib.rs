@@ -17,8 +17,7 @@
 
 #![feature(globs, macro_rules, phase, slicing_syntax)]
 
-#![warn(unused_qualifications, non_upper_case_globals, unused_typecasts, missing_docs,
-        unused_results)]
+#![warn(non_upper_case_globals, unused_typecasts, missing_docs, unused_results)]
 //#![warn(unstable)]
 
 #[phase(plugin)]
