@@ -171,7 +171,7 @@ impl<'a> Token<'a> {
     pub fn as_str(&self) -> &str {
         // `token` is a subset of ASCII, so this cannot produce invalid data.
         unsafe {
-            str::raw::from_utf8(self.as_bytes())
+            str::from_utf8_unchecked(self.as_bytes())
         }
     }
 
