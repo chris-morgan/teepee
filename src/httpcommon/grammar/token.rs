@@ -22,6 +22,7 @@
 //!           | "}" | SP | HT
 //! ```
 
+use std::borrow::BorrowFrom;
 use std::fmt;
 use std::str;
 use self::Token::{Owned, Slice};
@@ -188,4 +189,12 @@ impl<'a> Deref<str> for Token<'a> {
     fn deref(&self) -> &str {
         self.as_str()
     }
+}
+
+impl<'a> BorrowFrom<Token<'a>> for [u8] {
+    fn borrow_from<'b>(owned: &'b Token<'a>) -> &'b [u8] { owned.as_bytes() }
+}
+
+impl<'a> BorrowFrom<Token<'a>> for str {
+    fn borrow_from<'b>(owned: &'b Token<'a>) -> &'b str { owned.as_str() }
 }
