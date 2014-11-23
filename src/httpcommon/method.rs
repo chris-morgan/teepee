@@ -99,7 +99,7 @@ macro_rules! method_enum {
             ///
             /// See also `registered_from_token`.
             pub fn from_token(token: Token) -> Method {
-                match REGISTERED_METHODS.get_equiv(token.as_bytes()) {
+                match REGISTERED_METHODS.get(token.as_bytes()) {
                     Some(registered_token) => registered_token.clone(),
                     None => UnregisteredMethod {
                         name: token,
@@ -135,7 +135,7 @@ macro_rules! method_enum {
             ///
             /// See also `from_token`.
             pub fn registered_from_token(token: Token) -> Option<Method<'static>> {
-                REGISTERED_METHODS.get_equiv(token.as_bytes()).map(|t| t.clone())
+                REGISTERED_METHODS.get(token.as_bytes()).map(|t| t.clone())
             }
 
             /// Change a slice-token-based method to use an owned-token.
