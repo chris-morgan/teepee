@@ -386,7 +386,7 @@ impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
         let HeaderShowAdapter(h) = *self;
         match h.fmt_header(f) {
             Ok(v) => Ok(v),
-            Err(_) => Err(fmt::WriteError)
+            Err(_) => Err(fmt::Error)
         }
     }
 }
