@@ -1571,12 +1571,6 @@ impl StatusCode {
     }
 }
 
-impl fmt::Unsigned for StatusCode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (*self as u16).fmt(f)
-    }
-}
-
 /// Formats the status code, *including* the canonical reason.
 ///
 /// ```rust
@@ -1587,7 +1581,13 @@ impl fmt::Unsigned for StatusCode {
 ///            "123 <unknown status code>");
 /// ```
 ///
-/// If you wish to just include the number, use `Unsigned` instead (`{:u}`).
+/// If you wish to just include the number, cast to a `u16` instead:
+///
+/// ```rust
+/// # use httpcommon::status::{ImATeapot, Code123};
+/// assert_eq!(format!("{}", ImATeapot as u16).as_slice(), "418");
+/// assert_eq!(format!("{}", Code123 as u16).as_slice(), "123");
+/// ```
 impl fmt::Show for StatusCode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {}", *self as u16,
