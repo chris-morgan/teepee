@@ -1,36 +1,41 @@
 //! HTTP status codes.
 
-use std::cmp::{PartialEq, Eq, PartialOrd, Ord};
 use std::fmt;
 use std::mem::transmute;
 
 pub use self::StatusCode::*;
 pub use self::StatusClass::*;
 
-/// An HTTP status code (`Status-Code` in RFC 2616).
+/// An HTTP status code (`status-code` in RFC 7230 et al.).
 ///
 /// This enum is absolutely exhaustive, covering all 500 possible values (100–599).
 ///
-/// For HTTP/2.0, statuses belonging to the 1xx Informational class are invalid.
-///
 /// As this is a C‐style enum with each variant having a corresponding value, you may use the likes
-/// of `Continue as u16` to retreive the value `100u16`. Normally, though, you should not need to do
-/// any such thing; just use the status code as a `StatusCode`.
+/// of `Continue as u16` to retreive the value `100u16`. Normally, though, you should not need to
+/// do any such thing; just use the status code as a `StatusCode`.
 ///
-/// If you encounter a status code that you do not know how to deal with, you should treat it as the
-/// `x00` status code—e.g. for code 123, treat it as 100 (Continue). This can be achieved with
+/// If you encounter a status code that you do not know how to deal with, you should treat it as
+/// the `x00` status code—e.g. for code 123, treat it as 100 (Continue). This can be achieved with
 /// `self.class().default_code()`:
 ///
 /// ```rust
 /// # use httpcommon::status::{Code123, Continue};
 /// assert_eq!(Code123.class().default_code(), Continue);
 /// ```
+///
+/// IANA maintain the [Hypertext Transfer Protocol (HTTP) Status Code
+/// Registry](http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml) which is
+/// the source for this enum (with one exception, 418 I'm a teapot, which is inexplicably not
+/// in the register).
 pub enum StatusCode {
     /// 100 Continue
+    /// [[RFC7231, Section 6.2.1](https://tools.ietf.org/html/rfc7231#section-6.2.1)]
     Continue = 100,
     /// 101 Switching Protocols
+    /// [[RFC7231, Section 6.2.2](https://tools.ietf.org/html/rfc7231#section-6.2.2)]
     SwitchingProtocols = 101,
     /// 102 Processing
+    /// [[RFC2518](https://tools.ietf.org/html/rfc2518)]
     Processing = 102,
     /// 103 (unregistered)
     Code103 = 103,
@@ -228,22 +233,31 @@ pub enum StatusCode {
     Code199 = 199,
 
     /// 200 OK
+    /// [[RFC7231, Section 6.3.1](https://tools.ietf.org/html/rfc7231#section-6.3.1)]
     Ok = 200,
     /// 201 Created
+    /// [[RFC7231, Section 6.3.2](https://tools.ietf.org/html/rfc7231#section-6.3.2)]
     Created = 201,
     /// 202 Accepted
+    /// [[RFC7231, Section 6.3.3](https://tools.ietf.org/html/rfc7231#section-6.3.3)]
     Accepted = 202,
     /// 203 Non-Authoritative Information
+    /// [[RFC7231, Section 6.3.4](https://tools.ietf.org/html/rfc7231#section-6.3.4)]
     NonAuthoritativeInformation = 203,
     /// 204 No Content
+    /// [[RFC7231, Section 6.3.5](https://tools.ietf.org/html/rfc7231#section-6.3.5)]
     NoContent = 204,
     /// 205 Reset Content
+    /// [[RFC7231, Section 6.3.6](https://tools.ietf.org/html/rfc7231#section-6.3.6)]
     ResetContent = 205,
     /// 206 Partial Content
+    /// [[RFC7233, Section 4.1](https://tools.ietf.org/html/rfc7233#section-4.1)]
     PartialContent = 206,
     /// 207 Multi-Status
+    /// [[RFC4918](https://tools.ietf.org/html/rfc4918)]
     MultiStatus = 207,
     /// 208 Already Reported
+    /// [[RFC5842](https://tools.ietf.org/html/rfc5842)]
     AlreadyReported = 208,
     /// 209 (unregistered)
     Code209 = 209,
@@ -280,6 +294,7 @@ pub enum StatusCode {
     /// 225 (unregistered)
     Code225 = 225,
     /// 226 IM Used
+    /// [[RFC3229](https://tools.ietf.org/html/rfc3229)]
     ImUsed = 226,
     /// 227 (unregistered)
     Code227 = 227,
@@ -429,22 +444,31 @@ pub enum StatusCode {
     Code299 = 299,
 
     /// 300 Multiple Choices
+    /// [[RFC7231, Section 6.4.1](https://tools.ietf.org/html/rfc7231#section-6.4.1)]
     MultipleChoices = 300,
     /// 301 Moved Permanently
+    /// [[RFC7231, Section 6.4.2](https://tools.ietf.org/html/rfc7231#section-6.4.2)]
     MovedPermanently = 301,
     /// 302 Found
+    /// [[RFC7231, Section 6.4.3](https://tools.ietf.org/html/rfc7231#section-6.4.3)]
     Found = 302,
     /// 303 See Other
+    /// [[RFC7231, Section 6.4.4](https://tools.ietf.org/html/rfc7231#section-6.4.4)]
     SeeOther = 303,
     /// 304 Not Modified
+    /// [[RFC7232, Section 4.1](https://tools.ietf.org/html/rfc7232#section-4.1)]
     NotModified = 304,
     /// 305 Use Proxy
+    /// [[RFC7231, Section 6.4.5](https://tools.ietf.org/html/rfc7231#section-6.4.5)]
     UseProxy = 305,
-    /// 306 Switch Proxy
-    SwitchProxy = 306,
+    /// 306 (Unused)
+    /// [[RFC7231, Section 6.4.6](https://tools.ietf.org/html/rfc7231#section-6.4.6)]
+    Code306 = 306,
     /// 307 Temporary Redirect
+    /// [[RFC7231, Section 6.4.7](https://tools.ietf.org/html/rfc7231#section-6.4.7)]
     TemporaryRedirect = 307,
     /// 308 Permanent Redirect
+    /// [[RFC7238](https://tools.ietf.org/html/rfc7238)]
     PermanentRedirect = 308,
     /// 309 (unregistered)
     Code309 = 309,
@@ -630,68 +654,94 @@ pub enum StatusCode {
     Code399 = 399,
 
     /// 400 Bad Request
+    /// [[RFC7231, Section 6.5.1](https://tools.ietf.org/html/rfc7231#section-6.5.1)]
     BadRequest = 400,
     /// 401 Unauthorized
+    /// [[RFC7235, Section 3.1](https://tools.ietf.org/html/rfc7235#section-3.1)]
     Unauthorized = 401,
     /// 402 Payment Required
+    /// [[RFC7231, Section 6.5.2](https://tools.ietf.org/html/rfc7231#section-6.5.2)]
     PaymentRequired = 402,
     /// 403 Forbidden
+    /// [[RFC7231, Section 6.5.3](https://tools.ietf.org/html/rfc7231#section-6.5.3)]
     Forbidden = 403,
     /// 404 Not Found
+    /// [[RFC7231, Section 6.5.4](https://tools.ietf.org/html/rfc7231#section-6.5.4)]
     NotFound = 404,
     /// 405 Method Not Allowed
+    /// [[RFC7231, Section 6.5.5](https://tools.ietf.org/html/rfc7231#section-6.5.5)]
     MethodNotAllowed = 405,
     /// 406 Not Acceptable
+    /// [[RFC7231, Section 6.5.6](https://tools.ietf.org/html/rfc7231#section-6.5.6)]
     NotAcceptable = 406,
     /// 407 Proxy Authentication Required
+    /// [[RFC7235, Section 3.2](https://tools.ietf.org/html/rfc7235#section-3.2)]
     ProxyAuthenticationRequired = 407,
     /// 408 Request Timeout
+    /// [[RFC7231, Section 6.5.7](https://tools.ietf.org/html/rfc7231#section-6.5.7)]
     RequestTimeout = 408,
     /// 409 Conflict
+    /// [[RFC7231, Section 6.5.8](https://tools.ietf.org/html/rfc7231#section-6.5.8)]
     Conflict = 409,
     /// 410 Gone
+    /// [[RFC7231, Section 6.5.9](https://tools.ietf.org/html/rfc7231#section-6.5.9)]
     Gone = 410,
     /// 411 Length Required
+    /// [[RFC7231, Section 6.5.10](https://tools.ietf.org/html/rfc7231#section-6.5.10)]
     LengthRequired = 411,
     /// 412 Precondition Failed
+    /// [[RFC7232, Section 4.2](https://tools.ietf.org/html/rfc7232#section-4.2)]
     PreconditionFailed = 412,
-    /// 413 Request Entity Too Large
-    RequestEntityTooLarge = 413,
-    /// 414 Request-URI Too Long
-    RequestUriTooLong = 414,
+    /// 413 Payload Too Large
+    /// [[RFC7231, Section 6.5.11](https://tools.ietf.org/html/rfc7231#section-6.5.11)]
+    PayloadTooLarge = 413,
+    /// 414 URI Too Long
+    /// [[RFC7231, Section 6.5.12](https://tools.ietf.org/html/rfc7231#section-6.5.12)]
+    UriTooLong = 414,
     /// 415 Unsupported Media Type
+    /// [[RFC7231, Section 6.5.13](https://tools.ietf.org/html/rfc7231#section-6.5.13)]
     UnsupportedMediaType = 415,
-    /// 416 Requested Range Not Satisfiable
-    RequestedRangeNotSatisfiable = 416,
+    /// 416 Range Not Satisfiable
+    /// [[RFC7233, Section 4.4](https://tools.ietf.org/html/rfc7233#section-4.4)]
+    RangeNotSatisfiable = 416,
     /// 417 Expectation Failed
+    /// [[RFC7231, Section 6.5.14](https://tools.ietf.org/html/rfc7231#section-6.5.14)]
     ExpectationFailed = 417,
     /// 418 I'm a teapot
+    /// [curiously, not registered by IANA, but [RFC2324](https://tools.ietf.org/html/rfc2324)]
     ImATeapot = 418,
-    /// 419 Authentication Timeout
-    AuthenticationTimeout = 419,
+    /// 419 (unregistered)
+    Code419 = 419,
     /// 420 (unregistered)
     Code420 = 420,
     /// 421 (unregistered)
     Code421 = 421,
     /// 422 Unprocessable Entity
+    /// [[RFC4918](https://tools.ietf.org/html/rfc4918)]
     UnprocessableEntity = 422,
     /// 423 Locked
+    /// [[RFC4918](https://tools.ietf.org/html/rfc4918)]
     Locked = 423,
     /// 424 Failed Dependency
+    /// [[RFC4918](https://tools.ietf.org/html/rfc4918)]
     FailedDependency = 424,
-    /// 425 Unordered Collection
-    UnorderedCollection = 425,
+    /// 425 (unregistered)
+    Code425 = 425,
     /// 426 Upgrade Required
+    /// [[RFC7231, Section 6.5.15](https://tools.ietf.org/html/rfc7231#section-6.5.15)]
     UpgradeRequired = 426,
     /// 427 (unregistered)
     Code427 = 427,
     /// 428 Precondition Required
+    /// [[RFC6585](https://tools.ietf.org/html/rfc6585)]
     PreconditionRequired = 428,
     /// 429 Too Many Requests
+    /// [[RFC6585](https://tools.ietf.org/html/rfc6585)]
     TooManyRequests = 429,
     /// 430 (unregistered)
     Code430 = 430,
     /// 431 Request Header Fields Too Large
+    /// [[RFC6585](https://tools.ietf.org/html/rfc6585)]
     RequestHeaderFieldsTooLarge = 431,
     /// 432 (unregistered)
     Code432 = 432,
@@ -731,8 +781,10 @@ pub enum StatusCode {
     Code449 = 449,
     /// 450 (unregistered)
     Code450 = 450,
-    /// 451 Unavailable For Legal Reasons
-    UnavailableForLegalReasons = 451,
+    // Wanted 451 Unavailable For Legal Reasons? It expired and wasn’t followed up:
+    // https://tools.ietf.org/html/draft-tbray-http-legally-restricted-status-04
+    /// 451 (unregistered)
+    Code451 = 451,
     /// 452 (unregistered)
     Code452 = 452,
     /// 453 (unregistered)
@@ -831,28 +883,39 @@ pub enum StatusCode {
     Code499 = 499,
 
     /// 500 Internal Server Error
+    /// [[RFC7231, Section 6.6.1](https://tools.ietf.org/html/rfc7231#section-6.6.1)]
     InternalServerError = 500,
     /// 501 Not Implemented
+    /// [[RFC7231, Section 6.6.2](https://tools.ietf.org/html/rfc7231#section-6.6.2)]
     NotImplemented = 501,
     /// 502 Bad Gateway
+    /// [[RFC7231, Section 6.6.3](https://tools.ietf.org/html/rfc7231#section-6.6.3)]
     BadGateway = 502,
     /// 503 Service Unavailable
+    /// [[RFC7231, Section 6.6.4](https://tools.ietf.org/html/rfc7231#section-6.6.4)]
     ServiceUnavailable = 503,
     /// 504 Gateway Timeout
+    /// [[RFC7231, Section 6.6.5](https://tools.ietf.org/html/rfc7231#section-6.6.5)]
     GatewayTimeout = 504,
     /// 505 HTTP Version Not Supported
+    /// [[RFC7231, Section 6.6.6](https://tools.ietf.org/html/rfc7231#section-6.6.6)]
     HttpVersionNotSupported = 505,
     /// 506 Variant Also Negotiates
+    /// [[RFC2295](https://tools.ietf.org/html/rfc2295)]
     VariantAlsoNegotiates = 506,
     /// 507 Insufficient Storage
+    /// [[RFC4918](https://tools.ietf.org/html/rfc4918)]
     InsufficientStorage = 507,
     /// 508 Loop Detected
+    /// [[RFC5842](https://tools.ietf.org/html/rfc5842)]
     LoopDetected = 508,
     /// 509 (unregistered)
     Code509 = 509,
     /// 510 Not Extended
+    /// [[RFC2774](https://tools.ietf.org/html/rfc2774)]
     NotExtended = 510,
     /// 511 Network Authentication Required
+    /// [[RFC6585](https://tools.ietf.org/html/rfc6585)]
     NetworkAuthenticationRequired = 511,
     /// 512 (unregistered)
     Code512 = 512,
@@ -1034,10 +1097,10 @@ pub enum StatusCode {
 
 impl StatusCode {
 
-    /// Get the standardised `Reason-Phrase` for this status code.
+    /// Get the standardised `reason-phrase` for this status code.
     ///
-    /// This is mostly here for servers writing responses, but could potentially have application at
-    /// other times.
+    /// This is mostly here for servers writing responses, but could potentially have application
+    /// at other times.
     ///
     /// The reason phrase is defined as being exclusively for human readers. You should avoid
     /// deriving any meaning from it at all costs.
@@ -1254,7 +1317,7 @@ impl StatusCode {
             SeeOther => Some("See Other"),
             NotModified => Some("Not Modified"),
             UseProxy => Some("Use Proxy"),
-            SwitchProxy => Some("Switch Proxy"),
+            Code306 => None,
             TemporaryRedirect => Some("Temporary Redirect"),
             PermanentRedirect => Some("Permanent Redirect"),
             Code309 => None,
@@ -1362,19 +1425,19 @@ impl StatusCode {
             Gone => Some("Gone"),
             LengthRequired => Some("Length Required"),
             PreconditionFailed => Some("Precondition Failed"),
-            RequestEntityTooLarge => Some("Request Entity Too Large"),
-            RequestUriTooLong => Some("Request-URI Too Long"),
+            PayloadTooLarge => Some("Payload Too Large"),
+            UriTooLong => Some("URI Too Long"),
             UnsupportedMediaType => Some("Unsupported Media Type"),
-            RequestedRangeNotSatisfiable => Some("Requested Range Not Satisfiable"),
+            RangeNotSatisfiable => Some("Range Not Satisfiable"),
             ExpectationFailed => Some("Expectation Failed"),
             ImATeapot => Some("I'm a teapot"),
-            AuthenticationTimeout => Some("Authentication Timeout"),
+            Code419 => None,
             Code420 => None,
             Code421 => None,
             UnprocessableEntity => Some("Unprocessable Entity"),
             Locked => Some("Locked"),
             FailedDependency => Some("Failed Dependency"),
-            UnorderedCollection => Some("Unordered Collection"),
+            Code425 => None,
             UpgradeRequired => Some("Upgrade Required"),
             Code427 => None,
             PreconditionRequired => Some("Precondition Required"),
@@ -1400,7 +1463,7 @@ impl StatusCode {
             Code448 => None,
             Code449 => None,
             Code450 => None,
-            UnavailableForLegalReasons => Some("Unavailable For Legal Reasons"),
+            Code451 => None,
             Code452 => None,
             Code453 => None,
             Code454 => None,
@@ -1560,7 +1623,7 @@ impl StatusCode {
         if code < 200 {
             Informational
         } else if code < 300 {
-            Success
+            Successful
         } else if code < 400 {
             Redirection
         } else if code < 500 {
@@ -1595,8 +1658,8 @@ impl fmt::Show for StatusCode {
     }
 }
 
-// Specified manually because the codegen for derived is slow (at the time of writing on the machine
-// of writing, 1.2 seconds) and verbose (though the optimiser cuts it down to size).
+// Specified manually because the codegen for derived is slow (at the time of writing on the
+// machine of writing, 1.2 seconds) and verbose (though the optimiser cuts it down to size).
 impl PartialEq for StatusCode {
     #[inline]
     fn eq(&self, other: &StatusCode) -> bool {
@@ -1664,49 +1727,46 @@ impl ToPrimitive for StatusCode {
     }
 }
 
-/// The class of an HTTP `Status-Code`.
+/// The class of an HTTP `status-code`.
 ///
-/// [RFC 2616, section 6.1.1 (Status Code and Reason
-/// Phrase)](https://tools.ietf.org/html/rfc2616#section-6.1.1):
+/// [RFC 7231, section 6 (Response Status Codes)](https://tools.ietf.org/html/rfc7231#section-6):
 ///
-/// > The first digit of the Status-Code defines the class of response. The
-/// > last two digits do not have any categorization role.
-/// >
-/// > ...
-/// >
-/// > HTTP status codes are extensible. HTTP applications are not required
-/// > to understand the meaning of all registered status codes, though such
-/// > understanding is obviously desirable. However, applications MUST
+/// > The first digit of the status-code defines the class of response.
+/// > The last two digits do not have any categorization role.
+///
+/// And:
+///
+/// > HTTP status codes are extensible.  HTTP clients are not required to
+/// > understand the meaning of all registered status codes, though such
+/// > understanding is obviously desirable.  However, a client MUST
 /// > understand the class of any status code, as indicated by the first
-/// > digit, and treat any unrecognized response as being equivalent to the
-/// > x00 status code of that class, with the exception that an
-/// > unrecognized response MUST NOT be cached. For example, if an
-/// > unrecognized status code of 431 is received by the client, it can
-/// > safely assume that there was something wrong with its request and
-/// > treat the response as if it had received a 400 status code. In such
-/// > cases, user agents SHOULD present to the user the entity returned
-/// > with the response, since that entity is likely to include human-
-/// > readable information which will explain the unusual status.
+/// > digit, and treat an unrecognized status code as being equivalent to
+/// > the x00 status code of that class, with the exception that a
+/// > recipient MUST NOT cache a response with an unrecognized status code.
+/// >
+/// > For example, if an unrecognized status code of 471 is received by a
+/// > client, the client can assume that there was something wrong with its
+/// > request and treat the response as if it had received a 400 (Bad
+/// > Request) status code.  The response message will usually contain a
+/// > representation that explains the status.
 ///
 /// This can be used in cases where a status code’s meaning is unknown, also,
 /// to get the appropriate *category* of status.
-///
-/// For HTTP/2.0, the 1xx Informational class is invalid.
 #[deriving(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum StatusClass {
-    /// 1xx: Informational - Request received, continuing process
+    /// 1xx (Informational): The request was received, continuing process
     Informational = 100,
 
-    /// 2xx: Success - The action was successfully received, understood, and accepted
-    Success = 200,
+    /// 2xx (Successful): The request was successfully received, understood, and accepted
+    Successful = 200,
 
-    /// 3xx: Redirection - Further action must be taken in order to complete the request
+    /// 3xx (Redirection): Further action needs to be taken in order to complete the request
     Redirection = 300,
 
-    /// 4xx: Client Error - The request contains bad syntax or cannot be fulfilled
+    /// 4xx (Client Error): The request contains bad syntax or cannot be fulfilled
     ClientError = 400,
 
-    /// 5xx: Server Error - The server failed to fulfill an apparently valid request
+    /// 5xx (Server Error): The server failed to fulfill an apparently valid request
     ServerError = 500,
 }
 
@@ -1721,29 +1781,29 @@ impl StatusClass {
     /// assert_eq!(ClientError.default_code(), BadRequest);
     /// ```
     ///
-    /// The use for this is outlined in [RFC 2616, section 6.1.1 (Status Code and Reason
-    /// Phrase)](https://tools.ietf.org/html/rfc2616#section-6.1.1):
+    /// The use for this is outlined in [RFC 7231, section 6 (Response Status
+    /// Codes)](https://tools.ietf.org/html/rfc7231#section-6):
     ///
-    /// > HTTP status codes are extensible. HTTP applications are not required
-    /// > to understand the meaning of all registered status codes, though such
-    /// > understanding is obviously desirable. However, applications MUST
+    /// > HTTP status codes are extensible.  HTTP clients are not required to
+    /// > understand the meaning of all registered status codes, though such
+    /// > understanding is obviously desirable.  However, a client MUST
     /// > understand the class of any status code, as indicated by the first
-    /// > digit, and treat any unrecognized response as being equivalent to the
-    /// > x00 status code of that class, with the exception that an
-    /// > unrecognized response MUST NOT be cached. For example, if an
-    /// > unrecognized status code of 431 is received by the client, it can
-    /// > safely assume that there was something wrong with its request and
-    /// > treat the response as if it had received a 400 status code. In such
-    /// > cases, user agents SHOULD present to the user the entity returned
-    /// > with the response, since that entity is likely to include human-
-    /// > readable information which will explain the unusual status.
+    /// > digit, and treat an unrecognized status code as being equivalent to
+    /// > the x00 status code of that class, with the exception that a
+    /// > recipient MUST NOT cache a response with an unrecognized status code.
+    /// >
+    /// > For example, if an unrecognized status code of 471 is received by a
+    /// > client, the client can assume that there was something wrong with its
+    /// > request and treat the response as if it had received a 400 (Bad
+    /// > Request) status code.  The response message will usually contain a
+    /// > representation that explains the status.
     ///
-    /// This is demonstrated thusly (I’ll use 432 rather than 431 as 431 *is* now in use):
+    /// This is demonstrated thusly:
     ///
     /// ```rust
-    /// # use httpcommon::status::{Code432, BadRequest};
+    /// # use httpcommon::status::{Code471, BadRequest};
     /// // Suppose we have received this status code.
-    /// let status = Code432;
+    /// let status = Code471;
     ///
     /// // Uh oh! Don’t know what to do with it.
     /// // Let’s fall back to the default:
