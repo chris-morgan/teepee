@@ -23,5 +23,6 @@ path = "src/httpcommon/lib.rs"
 #path = "src/httpd/lib.rs"
 
 [dependencies]
+mucell = "*"
 phf = "*"
 phf_mac = "*"

@@ -1,8 +1,12 @@
 //! The internals of header representation. That is: `Item`.
 
 use std::any::AnyRefExt;
+use std::vec::CowVec;
+use std::borrow::Cow;
 
-use super::{Header, UncheckedAnyMutRefExt, fmt_header};
+use mucell::{MuCell, Ref};
+
+use super::{Header, UncheckedAnyMutRefExt, UncheckedAnyRefExt, fmt_header};
 
 /// All the header field values, raw or typed, with a shared field name.
 ///
@@ -21,7 +25,7 @@ use super::{Header, UncheckedAnyMutRefExt, fmt_header};
 /// - `raw == None` requires `!raw_valid`.
 /// - `raw == None && typed == None` is not legal.
 /// - `raw_valid == true` requires `raw` to be some with `.len() > 0`.
-pub struct Item {
+struct Inner {
     /// Whether the raw header form is valid. If a mutable reference is taken to `typed`, this will
     /// be set to `false`, meaning that for the purposes of reading, `raw` must be considered to be
     /// invalid and must be produced once again. This exists as a slight efficiency improvement over
@@ -42,55 +46,39 @@ pub struct Item {
     typed: Option<Box<Header + 'static>>,
 }
 
-impl PartialEq for Item {
-    fn eq(&self, other: &Item) -> bool {
-        match (self, other) {
-            (&Item { raw_valid: true, raw: Some(ref self_v), .. },
-             &Item { raw_valid: true, raw: Some(ref other_v), .. }) => self_v == other_v,
+#[deriving(PartialEq)]
+pub struct Item {
+    inner: MuCell<Inner>,
+}
 
-            (&Item { raw_valid: true, raw: Some(ref self_v), .. },
-             &Item { typed: Some(ref other_h), .. }) => match self_v[] {
+impl PartialEq for Inner {
+    fn eq(&self, other: &Inner) -> bool {
+        match (self, other) {
+            (&Inner { raw_valid: true, raw: Some(ref self_v), .. },
+             &Inner { raw_valid: true, raw: Some(ref other_v), .. }) => self_v == other_v,
+
+            (&Inner { raw_valid: true, raw: Some(ref self_v), .. },
+             &Inner { typed: Some(ref other_h), .. }) => match self_v[] {
                 [ref self_v_line] => self_v_line == &fmt_header(other_h),
                 _ => false,
             },
 
-            (&Item { typed: Some(ref self_h), .. },
-             &Item { raw_valid: true, raw: Some(ref other_v), .. }) => match other_v[] {
+            (&Inner { typed: Some(ref self_h), .. },
+             &Inner { raw_valid: true, raw: Some(ref other_v), .. }) => match other_v[] {
                 [ref other_v_line] => other_v_line == &fmt_header(self_h),
                 _ => false,
             },
 
-            (&Item { typed: Some(ref self_h), .. },
-             &Item { typed: Some(ref other_h), .. }) => fmt_header(self_h) == fmt_header(other_h),
+            (&Inner { typed: Some(ref self_h), .. },
+             &Inner { typed: Some(ref other_h), .. }) => fmt_header(self_h) == fmt_header(other_h),
 
             _ => unreachable!(),
         }
     }
 }
 
-impl Item {
-    /// Construct a new Item from a raw representation.
-    ///
-    /// The vector given MUST contain at least one value, or this will fail.
-    pub fn from_raw(raw: Vec<Vec<u8>>) -> Item {
-        assert!(raw.len() > 0);
-        Item {
-            raw_valid: true,
-            raw: Some(raw),
-            typed: None,
-        }
-    }
-
-    /// Construct a new Item from a typed representation.
-    pub fn from_typed<H: Header + 'static>(typed: H) -> Item {
-        Item {
-            raw_valid: false,
-            raw: None,
-            typed: Some(box typed as Box<Header + 'static>),
-        }
-    }
-
-    fn raw_mut_ref_internal(&mut self, invalidate_typed: bool) -> &mut Vec<Vec<u8>> {
+impl Inner {
+    fn raw_mut(&mut self, invalidate_typed: bool) -> &mut Vec<Vec<u8>> {
         if self.raw_valid == true {
             // All is good; we'll return the value in good time.
         } else {
@@ -114,40 +102,22 @@ impl Item {
         self.raw.as_mut().unwrap()
     }
 
-    /// Get a mutable reference to the raw representation of the header values.
-    ///
-    /// Because you may modify the raw representation through this mutable reference, calling this
-    /// invalidates the typed representation; next time you want to access the value in typed
-    /// fashion, it will be parsed from the raw form.
-    ///
-    /// Only use this if you need to mutate the raw form; if you don't, use `raw_ref`.
-    pub fn raw_mut_ref(&mut self) -> &mut Vec<Vec<u8>> {
-        self.raw_mut_ref_internal(true)
+    // Moo!
+    fn raw_cow(&self) -> CowVec<Vec<u8>> {
+        if self.raw_valid {
+            match self.raw {
+                Some(ref vec) => vec[].into_cow(),
+                None => unreachable!(),
+            }
+        } else {
+            match self.typed {
+                Some(ref typed) => vec![fmt_header(typed)].into_cow(),
+                None => unreachable!(),
+            }
+        }
     }
 
-    /// Get a reference to the raw representation of the header values.
-    ///
-    /// If a valid raw representation exists, it will be used, making this a very cheap operation;
-    /// if it does not, then the typed representation will be converted to raw form and you will
-    /// then get a reference to that. In summary, it doesn't much matter; you'll get your raw
-    /// reference.
-    ///
-    /// See also `raw_mut_ref`, if you wish to mutate the raw representation.
-    pub fn raw_ref(&mut self) -> &[Vec<u8>] {
-        self.raw_mut_ref_internal(false).as_slice()
-    }
-
-    /// Set the raw form of the header.
-    ///
-    /// This invalidates the typed representation.
-    pub fn set_raw(&mut self, raw: Vec<Vec<u8>>) {
-        self.raw_valid = true;
-        self.raw = Some(raw);
-        self.typed = None;
-    }
-
-    fn typed_mut_ref_internal<H: Header + 'static>
-                             (&mut self, invalidate_raw: bool) -> Option<&mut H> {
+    fn typed_mut<H: Header + 'static>(&mut self, invalidate_raw: bool) -> Option<&mut H> {
         match self.typed {
             None => {
                 debug_assert_eq!(self.raw_valid, true);
@@ -197,40 +167,187 @@ impl Item {
         }
     }
 
+    // Pass `false` to convert_if_necessary if `typed_mut` was called with the same `H`
+    // immediately before; otherwise pass `true`.
+    fn typed_cow<H: Header + 'static>(&self, convert_if_necessary: bool) -> Option<Cow<H, H>> {
+        match self.typed {
+            Some(ref h) if h.is::<H>() => {
+                Some(unsafe { Cow::Borrowed(h.downcast_ref_unchecked::<H>()) })
+            },
+            _ if convert_if_necessary => {
+                Header::parse_header(self.raw_cow()[]).map(|x| Cow::Owned(x))
+            },
+            _ => None,
+        }
+    }
+
+}
+
+mucell_ref_type! {
+    //#[doc = "TODO"]
+    struct RawRef<'a>(Inner)
+    impl Deref<[Vec<u8>]>
+    data: CowVec<'a, Vec<u8>> = |x| x.raw_cow()
+}
+
+impl<'a> RawRef<'a> {
+    /// Extract the owned data.
+    ///
+    /// Copies the data if it is not already owned.
+    pub fn into_owned(self) -> Vec<Vec<u8>> {
+        self._data.into_owned()
+    }
+}
+
+//mucell_ref_type! {
+//    //#[doc = "TODO"]
+//    struct TypedRef<'a, T: 'static>(Inner)
+//    impl Deref<T>
+//    data: Cow<'a, T, &'a T> = |x| x.typed_cow()
+//}
+
+/// An immutable reference to a `MuCell`. Dereference to get at the object.
+//$(#[$attr])*
+pub struct TypedRef<'a, H: Header + 'static> {
+    _parent: Ref<'a, Inner>,
+    _data: Cow<'a, H, H>,
+}
+
+impl<'a, H: Header + 'static> TypedRef<'a, H> {
+    /// Construct a reference from the cell.
+    fn from(cell: &'a MuCell<Inner>, convert_if_necessary: bool) -> Option<TypedRef<'a, H>> {
+        let parent = cell.borrow();
+        let inner: &'a Inner = unsafe { &*(&*parent as *const Inner) };
+        match inner.typed_cow(convert_if_necessary) {
+            Some(data) => Some(TypedRef {
+                _parent: parent,
+                _data: data,
+            }),
+            None => None,
+        }
+    }
+}
+
+#[unstable = "trait is not stable"]
+impl<'a, H: Header + 'static> Deref<H> for TypedRef<'a, H> {
+    fn deref<'b>(&'b self) -> &'b H {
+        &*self._data
+    }
+}
+
+impl<'a, H: Header + 'static> TypedRef<'a, H> {
+    /// Extract the owned data.
+    ///
+    /// Copies the data if it is not already owned.
+    pub fn into_owned(self) -> H {
+        self._data.into_owned()
+    }
+}
+
+/*************************************************************************************************/
+
+impl Item {
+    /// Construct a new Item from a raw representation.
+    ///
+    /// The vector given MUST contain at least one value, or this will fail.
+    pub fn from_raw(raw: Vec<Vec<u8>>) -> Item {
+        assert!(raw.len() > 0);
+        Item {
+            inner: MuCell::new(Inner {
+                raw_valid: true,
+                raw: Some(raw),
+                typed: None,
+            }),
+        }
+    }
+
+    /// Construct a new Item from a typed representation.
+    pub fn from_typed<H: Header + 'static>(typed: H) -> Item {
+        Item {
+            inner: MuCell::new(Inner {
+                raw_valid: false,
+                raw: None,
+                typed: Some(box typed as Box<Header + 'static>),
+            }),
+        }
+    }
+
+    /// Get a mutable reference to the raw representation of the header values.
+    ///
+    /// Because you may modify the raw representation through this mutable reference, calling this
+    /// invalidates the typed representation; next time you want to access the value in typed
+    /// fashion, it will be parsed from the raw form.
+    ///
+    /// Only use this if you need to mutate the raw form; if you don't, use `raw`.
+    pub fn raw_mut(&mut self) -> &mut Vec<Vec<u8>> {
+        self.inner.borrow_mut().raw_mut(true)
+    }
+
+    /// Get a reference to the raw representation of the header values.
+    ///
+    /// If a valid raw representation exists, it will be used, making this a very cheap operation;
+    /// if it does not, then the typed representation will be converted to raw form and you will
+    /// then get a reference to that. If there are no immutable references already taken, it will
+    /// be stored just in case you do it again and you’ll get a reference, otherwise you’ll get the
+    /// owned vector. But in summary, it doesn't much matter; you'll get an object that you can
+    /// dereference to get your raw reference.
+    ///
+    /// See also `raw_mut`, if you wish to mutate the raw representation.
+    pub fn raw(&self) -> RawRef {
+        self.inner.try_mutate(|inner| { let _ = inner.raw_mut(false); });
+        RawRef::from(&self.inner)
+    }
+
+    /// Set the raw form of the header.
+    ///
+    /// This invalidates the typed representation.
+    pub fn set_raw(&mut self, raw: Vec<Vec<u8>>) {
+        let inner = self.inner.borrow_mut();
+        inner.raw_valid = true;
+        inner.raw = Some(raw);
+        inner.typed = None;
+    }
+
     /// Get a mutable reference to the typed representation of the header values.
     ///
     /// Because you may modify the typed representation through this mutable reference, calling
     /// this invalidates the raw representation; next time you want to access the value in raw
     /// fashion, it will be produced from the typed form.
     ///
-    /// Only use this if you need to mutate the typed form; if you don't, use `typed_ref`.
-    pub fn typed_mut_ref<H: Header + 'static>(&mut self) -> Option<&mut H> {
-        self.typed_mut_ref_internal(true)
+    /// Only use this if you need to mutate the typed form; if you don't, use `typed`.
+    pub fn typed_mut<H: Header + 'static>(&mut self) -> Option<&mut H> {
+        self.inner.borrow_mut().typed_mut(true)
     }
 
     /// Get a reference to the typed representation of the header values.
     ///
-    /// If a valid typed representation exists, it will be used, making this a very cheap operation;
-    /// if it does not, then the raw representation will be converted to typed form and you will
-    /// then get a reference to that. In summary, it doesn't much matter; you'll get your typed
-    /// reference.
+    /// If a valid typed representation exists, it will be used, making this a very cheap
+    /// operation; if it does not, then the raw representation will be converted to typed form and
+    /// you will then get a reference to that. If there are no immutable references already taken,
+    /// it will be stored just in case you do it again and you’ll get a reference, otherwise you’ll
+    /// get the owned vector. In summary, it doesn't much matter; you'll get an object that you
+    /// can dereference to get your typed reference.
     ///
-    /// See also `typed_mut_ref`, if you wish to mutate the typed representation.
-    pub fn typed_ref<H: Header + 'static>(&mut self) -> Option<&H> {
-        self.typed_mut_ref_internal(false).map(|h| &*h)
+    /// See also `typed_mut`, if you wish to mutate the typed representation.
+    pub fn typed<H: Header + 'static>(&self) -> Option<TypedRef<H>> {
+        let convert_if_necessary = self.inner.try_mutate(|inner| {
+            let _ = inner.typed_mut::<H>(false);
+        });
+        TypedRef::from(&self.inner, convert_if_necessary)
     }
 
     /// Set the typed form of the header.
     ///
     /// This invalidates the raw representation.
     pub fn set_typed<H: Header + 'static>(&mut self, value: H) {
-        self.raw_valid = false;
-        self.typed = Some(box value as Box<Header + 'static>);
+        let inner = self.inner.borrow_mut();
+        inner.raw_valid = false;
+        inner.typed = Some(box value as Box<Header + 'static>);
     }
 }
 
 #[cfg(test)]
-impl Item {
+impl Inner {
     fn assert_invariants(&self) {
         assert!(self.raw.is_some() || !self.raw_valid);
         assert!(self.raw.is_some() || self.typed.is_some());
@@ -239,23 +356,25 @@ impl Item {
 }
 
 #[cfg(test)]
+#[allow(unused_mut)]
 mod tests {
-    use super::Item;
+    use super::{Item, Inner};
     use super::super::Header;
     use std::fmt;
     use std::any::AnyRefExt;
     use std::io::IoResult;
+    use mucell::MuCell;
 
     fn mkitem<H: Header + 'static>(raw_valid: bool,
                                    raw: Option<Vec<Vec<u8>>>,
                                    typed: Option<H>) -> Item {
-        let item = Item {
+        let item = Inner {
             raw_valid: raw_valid,
             raw: raw,
             typed: typed.map(|h| box h as Box<Header + 'static>),
         };
         item.assert_invariants();
-        item
+        Item { inner: MuCell::new(item) }
     }
 
     #[deriving(PartialEq, Eq, Clone, Show)]
@@ -299,6 +418,8 @@ mod tests {
     }
 
     fn assert_headers_eq<H: Header + Clone + PartialEq + fmt::Show + 'static>(item: &Item, other: &Item) {
+        let item = item.inner.borrow();
+        let other = other.inner.borrow();
         item.assert_invariants();
         assert_eq!(item.raw_valid, other.raw_valid);
         assert_eq!(item.raw, other.raw);
@@ -416,50 +537,55 @@ mod tests {
     // disagree with me—I can see that it is a bit of a tangle. Stick at it and you should be able
     // to understand it. I'm sorry I caused you trouble.
 
-    t!(set_raw_with_raw             => (t, 1, - st) set_raw(,d3raw()) (t, 3, - st))
-    t!(set_raw_with_typed           => (f, -, 1 st) set_raw(,d3raw()) (t, 3, - st))
-    t!(set_raw_with_both            => (t, 1, 3 st) set_raw(,d3raw()) (t, 3, - st))
-    t!(set_raw_with_invalid_raw     => (f, 1, 3 st) set_raw(,d3raw()) (t, 3, - st))
+    t!(set_raw_with_raw         => (t, 1, - st) set_raw(,d3raw()) (t, 3, - st))
+    t!(set_raw_with_typed       => (f, -, 1 st) set_raw(,d3raw()) (t, 3, - st))
+    t!(set_raw_with_both        => (t, 1, 3 st) set_raw(,d3raw()) (t, 3, - st))
+    t!(set_raw_with_invalid_raw => (f, 1, 3 st) set_raw(,d3raw()) (t, 3, - st))
 
-    t!(raw_mut_ref_with_raw         => (t, 1, - st) raw_mut_ref()     (t, 1, - st))
-    t!(raw_mut_ref_with_typed       => (f, -, 1 st) raw_mut_ref()     (t, 2, - st))
-    t!(raw_mut_ref_with_both        => (t, 1, 3 st) raw_mut_ref()     (t, 1, - st))
-    t!(raw_mut_ref_with_invalid_raw => (f, 1, 3 st) raw_mut_ref()     (t, 4, - st))
+    t!(raw_mut_with_raw         => (t, 1, - st) raw_mut()     (t, 1, - st))
+    t!(raw_mut_with_typed       => (f, -, 1 st) raw_mut()     (t, 2, - st))
+    t!(raw_mut_with_both        => (t, 1, 3 st) raw_mut()     (t, 1, - st))
+    t!(raw_mut_with_invalid_raw => (f, 1, 3 st) raw_mut()     (t, 4, - st))
 
-    t!(raw_ref_with_raw             => (t, 1, - st) raw_ref()         (t, 1, - st))
-    t!(raw_ref_with_typed           => (f, -, 1 st) raw_ref()         (t, 2, 1 st))
-    t!(raw_ref_with_both            => (t, 1, 3 st) raw_ref()         (t, 1, 3 st))
-    t!(raw_ref_with_invalid_raw     => (f, 1, 3 st) raw_ref()         (t, 4, 3 st))
+    t!(raw_with_raw             => (t, 1, - st) raw()         (t, 1, - st))
+    t!(raw_with_typed           => (f, -, 1 st) raw()         (t, 2, 1 st))
+    t!(raw_with_both            => (t, 1, 3 st) raw()         (t, 1, 3 st))
+    t!(raw_with_invalid_raw     => (f, 1, 3 st) raw()         (t, 4, 3 st))
 
-    t!(set_typed_with_raw                      => (t, 1, - st) set_typed(,d3st()) (f, 1, 3 st))
-    t!(set_typed_with_typed                    => (f, -, 1 st) set_typed(,d3st()) (f, -, 3 st))
-    t!(set_typed_with_other                    => (f, -, 1 np) set_typed(,d3st()) (f, -, 3 st))
-    t!(set_typed_with_other_and_invalid        => (f, 1, 1 np) set_typed(,d3st()) (f, 1, 3 st))
-    t!(set_typed_with_other_and_raw            => (t, 1, 1 np) set_typed(,d3st()) (f, 1, 3 st))
+    t!(set_typed_with_raw                  => (t, 1, - st) set_typed(,d3st()) (f, 1, 3 st))
+    t!(set_typed_with_typed                => (f, -, 1 st) set_typed(,d3st()) (f, -, 3 st))
+    t!(set_typed_with_other                => (f, -, 1 np) set_typed(,d3st()) (f, -, 3 st))
+    t!(set_typed_with_other_and_invalid    => (f, 1, 1 np) set_typed(,d3st()) (f, 1, 3 st))
+    t!(set_typed_with_other_and_raw        => (t, 1, 1 np) set_typed(,d3st()) (f, 1, 3 st))
 
-    t!(typed_mut_ref_with_raw                  => (t, 1, - st) typed_mut_ref()/st (f, 1, 1 st))
-    t!(typed_mut_ref_with_typed                => (f, -, 1 st) typed_mut_ref()/st (f, -, 1 st))
-    t!(typed_mut_ref_with_other                => (f, -, 3 np) typed_mut_ref()/st (f, 4, 4 st))
-    t!(typed_mut_ref_with_other_and_invalid    => (f, 1, 3 np) typed_mut_ref()/st (f, 4, 4 st))
-    t!(typed_mut_ref_with_other_and_raw        => (t, 1, 3 np) typed_mut_ref()/st (f, 1, 1 st))
-    t!(typed_mut_ref_with_other_np             => (f, -, 3 st) typed_mut_ref()/np (f, 4, 3 st))
-    t!(typed_mut_ref_with_other_and_invalid_np => (f, 1, 3 st) typed_mut_ref()/np (f, 4, 3 st))
-    t!(typed_mut_ref_with_other_and_raw_np     => (t, 1, 3 st) typed_mut_ref()/np (f, 1, 3 st))
+    t!(typed_mut_with_raw                  => (t, 1, - st) typed_mut()/st (f, 1, 1 st))
+    t!(typed_mut_with_typed                => (f, -, 1 st) typed_mut()/st (f, -, 1 st))
+    t!(typed_mut_with_other                => (f, -, 3 np) typed_mut()/st (f, 4, 4 st))
+    t!(typed_mut_with_other_and_invalid    => (f, 1, 3 np) typed_mut()/st (f, 4, 4 st))
+    t!(typed_mut_with_other_and_raw        => (t, 1, 3 np) typed_mut()/st (f, 1, 1 st))
+    t!(typed_mut_with_other_np             => (f, -, 3 st) typed_mut()/np (f, 4, 3 st))
+    t!(typed_mut_with_other_and_invalid_np => (f, 1, 3 st) typed_mut()/np (f, 4, 3 st))
+    t!(typed_mut_with_other_and_raw_np     => (t, 1, 3 st) typed_mut()/np (f, 1, 3 st))
 
-    t!(typed_ref_with_raw                      => (t, 1, - st) typed_ref()/st     (t, 1, 1 st))
-    t!(typed_ref_with_typed                    => (f, -, 1 st) typed_ref()/st     (f, -, 1 st))
-    t!(typed_ref_with_other                    => (f, -, 3 np) typed_ref()/st     (t, 4, 4 st))
-    t!(typed_ref_with_other_and_invalid        => (f, 1, 3 np) typed_ref()/st     (t, 4, 4 st))
-    t!(typed_ref_with_other_and_raw            => (t, 1, 3 np) typed_ref()/st     (t, 1, 1 st))
-    t!(typed_ref_with_other_np                 => (f, -, 3 st) typed_ref()/np     (t, 4, 3 st))
-    t!(typed_ref_with_other_and_invalid_np     => (f, 1, 3 st) typed_ref()/np     (t, 4, 3 st))
-    t!(typed_ref_with_other_and_raw_np         => (t, 1, 3 st) typed_ref()/np     (t, 1, 3 st))
+    t!(typed_with_raw                      => (t, 1, - st) typed()/st     (t, 1, 1 st))
+    t!(typed_with_typed                    => (f, -, 1 st) typed()/st     (f, -, 1 st))
+    t!(typed_with_other                    => (f, -, 3 np) typed()/st     (t, 4, 4 st))
+    t!(typed_with_other_and_invalid        => (f, 1, 3 np) typed()/st     (t, 4, 4 st))
+    t!(typed_with_other_and_raw            => (t, 1, 3 np) typed()/st     (t, 1, 1 st))
+    t!(typed_with_other_np                 => (f, -, 3 st) typed()/np     (t, 4, 3 st))
+    t!(typed_with_other_and_invalid_np     => (f, 1, 3 st) typed()/np     (t, 4, 3 st))
+    t!(typed_with_other_and_raw_np         => (t, 1, 3 st) typed()/np     (t, 1, 3 st))
 
     macro_rules! fmtitem {
         ($e:expr) => {{
-            let item = $e;
+            let outer = $e;
+            let item = outer.inner.borrow();
+            let typed = match item.typed {
+                Some(ref t) => Some(super::super::fmt_header(t)),
+                None => None,
+            };
             format!("Item {{ raw_valid: {}, raw: {}, typed: {} }}", item.raw_valid, item.raw,
-                    item.typed.map(|t| super::super::fmt_header(&t)))
+                    typed)
         }}
     }
 

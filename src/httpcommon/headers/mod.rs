@@ -4,18 +4,19 @@ use std::any::{AnyRefExt, Any};
 use std::mem::{transmute, transmute_copy};
 use std::intrinsics::TypeId;
 use std::fmt;
-use std::io::{MemWriter, IoResult};
+use std::io::IoResult;
 use std::raw::TraitObject;
 use std::str::SendStr;
 
 use std::collections::hash_map::{HashMap, Occupied, Vacant};
 
 use self::internals::Item;
+pub use self::internals::{TypedRef, RawRef};
 
 mod internals;
 
 /// The data type of an HTTP header for encoding and decoding.
-pub trait Header: Any {
+pub trait Header: Any + Clone {
     /// Parse a header from one or more header field values, returning some value if successful or
     /// `None` if parsing fails.
     ///
@@ -31,10 +32,14 @@ pub trait Header: Any {
     /// through fmt_header and then back into the new type through parse_header. Should the
     /// fmt_header call have return an Err, it will fail.
     fn fmt_header(&self, writer: &mut Writer) -> IoResult<()>;
+
+    #[doc(hidden)]
+    #[inline]
+    fn clone_boxed(&self) -> Box<Header + 'static> { box self.clone() }
 }
 
 // impl copied from std::any. Not especially nice, sorry :-(
-impl<'a> AnyRefExt<'a> for &'a Header + 'a {
+impl<'a> AnyRefExt<'a> for &'a (Header + 'a) {
     #[inline]
     fn is<T: 'static>(self) -> bool {
         // Get TypeId of the type this function is instantiated with
@@ -64,7 +69,7 @@ trait UncheckedAnyRefExt<'a> {
     unsafe fn downcast_ref_unchecked<T: 'static>(self) -> &'a T;
 }
 
-impl<'a> UncheckedAnyRefExt<'a> for &'a Header + 'a {
+impl<'a> UncheckedAnyRefExt<'a> for &'a (Header + 'a) {
     #[inline]
     unsafe fn downcast_ref_unchecked<T: 'static>(self) -> &'a T {
         // Get the raw representation of the trait object
@@ -82,7 +87,7 @@ trait UncheckedAnyMutRefExt<'a> {
     unsafe fn downcast_mut_unchecked<T: 'static>(self) -> &'a mut T;
 }
 
-impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header + 'a {
+impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut (Header + 'a) {
     #[inline]
     unsafe fn downcast_mut_unchecked<T: 'static>(self) -> &'a mut T {
         // Get the raw representation of the trait object
@@ -129,13 +134,13 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header + 'a {
 /// # }
 /// # struct FOO;
 /// # impl httpcommon::headers::HeaderMarker<Foo> for FOO {
-/// #     fn header_name(&self) -> std::str::SendStr { std::str::Slice("foo") }
+/// #     fn header_name(&self) -> std::str::SendStr { "foo".into_cow() }
 /// # }
 /// # struct Request { headers: httpcommon::headers::Headers }
 /// # let mut request = Request { headers: httpcommon::headers::Headers::new() };
 /// # request.headers.set(FOO, Foo);
 /// // Of course, this is assuming that we *know* the header is there
-/// let foo = request.headers.get(FOO).unwrap();
+/// let foo = request.headers.get(FOO).unwrap().into_owned();
 /// request.headers.set(FOO, foo);
 /// ```
 ///
@@ -153,6 +158,12 @@ pub trait HeaderMarker<OutputType: Header + 'static> {
     fn header_name(&self) -> SendStr;
 }
 
+impl Clone for Box<Header + 'static> {
+    fn clone(&self) -> Box<Header + 'static> {
+        self.clone_boxed()
+    }
+}
+
 impl Header for Box<Header + 'static> {
     fn parse_header(_raw: &[Vec<u8>]) -> Option<Box<Header + 'static>> {
         // Dummy impl; XXX: split to ToHeader/FromHeader?
@@ -164,8 +175,8 @@ impl Header for Box<Header + 'static> {
     }
 }
 
-impl<'a> Header for &'static Header + 'static {
-    fn parse_header(_raw: &[Vec<u8>]) -> Option<&'static Header + 'static> {
+impl<'a> Header for &'static (Header + 'static) {
+    fn parse_header(_raw: &[Vec<u8>]) -> Option<&'static (Header + 'static)> {
         // Dummy impl; XXX: split to ToHeader/FromHeader?
         None
     }
@@ -300,30 +311,18 @@ impl Headers {
 
 impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
 
-    /// Retrieve a header value. The value is a clone of the one that is stored internally.
-    ///
-    /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get(&mut self, header_marker: M) -> Option<H> {
-        self.get_ref(header_marker).map(|h: &H| h.clone())
-    }
-
     /// Get a reference to a header value.
     ///
-    /// Bear in mind that because of the internals, this method (and also `get` and `get_mut_ref`)
-    /// takes `&mut self`; in consequence, you won't be able to take references to two headers at
-    /// once. That is, in fact, why `get` is there---to provide a convenient way to avoid that
-    /// problem, by immediately cloning the header value.
-    ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get_ref(&mut self, header_marker: M) -> Option<&H> {
-        self.data.get_mut(&header_marker.header_name()).and_then(|item| item.typed_ref())
+    pub fn get(&self, header_marker: M) -> Option<TypedRef<H>> {
+        self.data.get(&header_marker.header_name()).and_then(|item| item.typed::<H>())
     }
 
     /// Get a mutable reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get_mut_ref(&mut self, header_marker: M) -> Option<&mut H> {
-        self.data.get_mut(&header_marker.header_name()).and_then(|item| item.typed_mut_ref())
+    pub fn get_mut(&mut self, header_marker: M) -> Option<&mut H> {
+        self.data.get_mut(&header_marker.header_name()).and_then(|item| item.typed_mut::<H>())
     }
 
     /// Set the named header to the given value.
@@ -338,24 +337,16 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     ///
     /// The returned value is a slice of each header field value.
     #[inline]
-    pub fn get_raw(&mut self, header_marker: M) -> Option<Vec<Vec<u8>>> {
-        self.get_raw_ref(header_marker).map(|h| h.iter().map(|v| v.clone()).collect())
-    }
-
-    /// Get the raw values of a header, by name.
-    ///
-    /// The returned value is a slice of each header field value.
-    #[inline]
-    pub fn get_raw_ref(&mut self, header_marker: M) -> Option<&[Vec<u8>]> {
-        self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_ref())
+    pub fn get_raw(&self, header_marker: M) -> Option<RawRef> {
+        self.data.get(&header_marker.header_name()).map(|item| item.raw())
     }
 
     /// Get a mutable reference to the raw values of a header, by name.
     ///
     /// The returned vector contains each header field value.
     #[inline]
-    pub fn get_raw_mut_ref(&mut self, header_marker: M) -> Option<&mut Vec<Vec<u8>>> {
-        self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_mut_ref())
+    pub fn get_raw_mut(&mut self, header_marker: M) -> Option<&mut Vec<Vec<u8>>> {
+        self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_mut())
     }
 
     /// Set the raw value of a header, by name.
@@ -394,11 +385,11 @@ impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
 #[inline]
 /// Convert a typed header into the raw HTTP header field value.
 pub fn fmt_header<H: Header>(h: &H) -> Vec<u8> {
-    let mut output = MemWriter::new();
-    // Result.unwrap() is correct here, for MemWriter won’t make an IoError,
+    let mut output = vec![];
+    // Result.unwrap() is correct here, for Vec won’t make an IoError,
     // and fmt_header is not permitted to introduce one of its own.
     h.fmt_header(&mut output).unwrap();
-    output.unwrap()
+    output
 }
 
 #[cfg(test_broken)]
