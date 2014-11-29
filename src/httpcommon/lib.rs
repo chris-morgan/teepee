@@ -7,11 +7,6 @@
 //! should be exported in the root of the HTTP client crate ``httpc`` so that people can write
 //! ``httpc::status`` instead of ``httpcommon::status``.
 
-#![crate_name = "httpcommon"]
-#![comment = "Common HTTP functionality for the Teepee project"]
-#![license = "MIT/ASL2"]
-#![crate_type = "lib"]
-
 #![doc(html_logo_url = "http://teepee.rs/logo.100.png",
        html_root_url = "http://www.rust-ci.org/teepee/teepee/doc/")]
 
