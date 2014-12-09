@@ -16,7 +16,7 @@ pub use self::internals::{TypedRef, RawRef};
 mod internals;
 
 /// The data type of an HTTP header for encoding and decoding.
-pub trait Header: Any + Clone {
+pub trait Header: Any {
     /// Parse a header from one or more header field values, returning some value if successful or
     /// `None` if parsing fails.
     ///
@@ -32,10 +32,6 @@ pub trait Header: Any + Clone {
     /// through fmt_header and then back into the new type through parse_header. Should the
     /// fmt_header call have return an Err, it will fail.
     fn fmt_header(&self, writer: &mut Writer) -> IoResult<()>;
-
-    #[doc(hidden)]
-    #[inline]
-    fn clone_boxed(&self) -> Box<Header + 'static> { box self.clone() }
 }
 
 // impl copied from std::any. Not especially nice, sorry :-(
@@ -156,12 +152,6 @@ pub trait HeaderMarker<OutputType: Header + 'static> {
     /// Normally this will be a static string, but occasionally it may be necessary to define it at
     /// runtime, for dynamic header handling.
     fn header_name(&self) -> SendStr;
-}
-
-impl Clone for Box<Header + 'static> {
-    fn clone(&self) -> Box<Header + 'static> {
-        self.clone_boxed()
-    }
 }
 
 impl Header for Box<Header + 'static> {
@@ -310,14 +300,15 @@ impl Headers {
 }
 
 impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
-
     /// Get a reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
     pub fn get(&self, header_marker: M) -> Option<TypedRef<H>> {
         self.data.get(&header_marker.header_name()).and_then(|item| item.typed::<H>())
     }
+}
 
+impl<H: Header + 'static, M: HeaderMarker<H>> Headers {
     /// Get a mutable reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.

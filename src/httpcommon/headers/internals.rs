@@ -169,7 +169,7 @@ impl Inner {
 
     // Pass `false` to convert_if_necessary if `typed_mut` was called with the same `H`
     // immediately before; otherwise pass `true`.
-    fn typed_cow<H: Header + 'static>(&self, convert_if_necessary: bool) -> Option<Cow<H, H>> {
+    fn typed_cow<H: Header + Clone + 'static>(&self, convert_if_necessary: bool) -> Option<Cow<H, H>> {
         match self.typed {
             Some(ref h) if h.is::<H>() => {
                 Some(unsafe { Cow::Borrowed(h.downcast_ref_unchecked::<H>()) })
@@ -208,12 +208,12 @@ impl<'a> RawRef<'a> {
 
 /// An immutable reference to a `MuCell`. Dereference to get at the object.
 //$(#[$attr])*
-pub struct TypedRef<'a, H: Header + 'static> {
+pub struct TypedRef<'a, H: Header + Clone + 'static> {
     _parent: Ref<'a, Inner>,
     _data: Cow<'a, H, H>,
 }
 
-impl<'a, H: Header + 'static> TypedRef<'a, H> {
+impl<'a, H: Header + Clone + 'static> TypedRef<'a, H> {
     /// Construct a reference from the cell.
     fn from(cell: &'a MuCell<Inner>, convert_if_necessary: bool) -> Option<TypedRef<'a, H>> {
         let parent = cell.borrow();
@@ -229,13 +229,13 @@ impl<'a, H: Header + 'static> TypedRef<'a, H> {
 }
 
 #[unstable = "trait is not stable"]
-impl<'a, H: Header + 'static> Deref<H> for TypedRef<'a, H> {
+impl<'a, H: Header + Clone + 'static> Deref<H> for TypedRef<'a, H> {
     fn deref<'b>(&'b self) -> &'b H {
         &*self._data
     }
 }
 
-impl<'a, H: Header + 'static> TypedRef<'a, H> {
+impl<'a, H: Header + Clone + 'static> TypedRef<'a, H> {
     /// Extract the owned data.
     ///
     /// Copies the data if it is not already owned.
@@ -329,7 +329,7 @@ impl Item {
     /// can dereference to get your typed reference.
     ///
     /// See also `typed_mut`, if you wish to mutate the typed representation.
-    pub fn typed<H: Header + 'static>(&self) -> Option<TypedRef<H>> {
+    pub fn typed<H: Header + Clone + 'static>(&self) -> Option<TypedRef<H>> {
         let convert_if_necessary = self.inner.try_mutate(|inner| {
             let _ = inner.typed_mut::<H>(false);
         });
