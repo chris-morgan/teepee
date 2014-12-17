@@ -1634,6 +1634,8 @@ impl StatusCode {
     }
 }
 
+impl Copy for StatusCode {}
+
 /// Formats the status code, *including* the canonical reason.
 ///
 /// ```rust
@@ -1752,7 +1754,7 @@ impl ToPrimitive for StatusCode {
 ///
 /// This can be used in cases where a status code’s meaning is unknown, also,
 /// to get the appropriate *category* of status.
-#[deriving(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[deriving(Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
 pub enum StatusClass {
     /// 1xx (Informational): The request was received, continuing process
     Informational = 100,

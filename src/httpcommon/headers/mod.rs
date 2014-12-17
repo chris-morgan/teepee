@@ -1,7 +1,7 @@
 //! HTTP headers.
 
 use std::any::{AnyRefExt, Any};
-use std::mem::{transmute, transmute_copy};
+use std::mem::transmute;
 use std::intrinsics::TypeId;
 use std::fmt;
 use std::io::IoResult;
@@ -49,7 +49,7 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 }
 
 // impl copied from std::any. Not especially nice, sorry :-(
-impl<'a> AnyRefExt<'a> for &'a (Header + 'a) {
+impl<'a> AnyRefExt<'a> for &'a Header {
     #[inline]
     fn is<T: 'static>(self) -> bool {
         // Get TypeId of the type this function is instantiated with
@@ -79,11 +79,11 @@ trait UncheckedAnyRefExt<'a> {
     unsafe fn downcast_ref_unchecked<T: 'static>(self) -> &'a T;
 }
 
-impl<'a> UncheckedAnyRefExt<'a> for &'a (Header + 'a) {
+impl<'a> UncheckedAnyRefExt<'a> for &'a Header {
     #[inline]
     unsafe fn downcast_ref_unchecked<T: 'static>(self) -> &'a T {
         // Get the raw representation of the trait object
-        let to: TraitObject = transmute_copy(&self);
+        let to: TraitObject = transmute(self);
 
         // Extract the data pointer
         transmute(to.data)
@@ -97,11 +97,11 @@ trait UncheckedAnyMutRefExt<'a> {
     unsafe fn downcast_mut_unchecked<T: 'static>(self) -> &'a mut T;
 }
 
-impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut (Header + 'a) {
+impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
     #[inline]
     unsafe fn downcast_mut_unchecked<T: 'static>(self) -> &'a mut T {
         // Get the raw representation of the trait object
-        let to: TraitObject = transmute_copy(&self);
+        let to: TraitObject = transmute(self);
 
         // Extract the data pointer
         transmute(to.data)
