@@ -392,9 +392,9 @@ mod tests {
             let mut first = true;
             for field in vec.iter() {
                 if !first {
-                    try!(w.write(b", "))
+                    try!(w.write(b", "));
                 }
-                try!(w.write(field.as_slice()))
+                try!(w.write(field.as_slice()));
                 first = false;
             }
             Ok(())
@@ -493,7 +493,7 @@ mod tests {
         (- np) => (None::<NonParsingStrongType>);
         (- $x:tt) => (None);
     }
-    macro_rules! _bool((t)=>(true);(f)=>(false))
+    macro_rules! _bool((t)=>(true);(f)=>(false));
     macro_rules! _item {
         ($valid:tt, $raw:tt, $ty_n:tt $ty_ty:tt) => {
             mkitem(_bool!($valid), _thing!($raw raw), _thing!($ty_n $ty_ty))
@@ -537,44 +537,44 @@ mod tests {
     // disagree with me—I can see that it is a bit of a tangle. Stick at it and you should be able
     // to understand it. I'm sorry I caused you trouble.
 
-    t!(set_raw_with_raw         => (t, 1, - st) set_raw(,d3raw()) (t, 3, - st))
-    t!(set_raw_with_typed       => (f, -, 1 st) set_raw(,d3raw()) (t, 3, - st))
-    t!(set_raw_with_both        => (t, 1, 3 st) set_raw(,d3raw()) (t, 3, - st))
-    t!(set_raw_with_invalid_raw => (f, 1, 3 st) set_raw(,d3raw()) (t, 3, - st))
+    t!(set_raw_with_raw         => (t, 1, - st) set_raw(,d3raw()) (t, 3, - st));
+    t!(set_raw_with_typed       => (f, -, 1 st) set_raw(,d3raw()) (t, 3, - st));
+    t!(set_raw_with_both        => (t, 1, 3 st) set_raw(,d3raw()) (t, 3, - st));
+    t!(set_raw_with_invalid_raw => (f, 1, 3 st) set_raw(,d3raw()) (t, 3, - st));
 
-    t!(raw_mut_with_raw         => (t, 1, - st) raw_mut()     (t, 1, - st))
-    t!(raw_mut_with_typed       => (f, -, 1 st) raw_mut()     (t, 2, - st))
-    t!(raw_mut_with_both        => (t, 1, 3 st) raw_mut()     (t, 1, - st))
-    t!(raw_mut_with_invalid_raw => (f, 1, 3 st) raw_mut()     (t, 4, - st))
+    t!(raw_mut_with_raw         => (t, 1, - st) raw_mut()     (t, 1, - st));
+    t!(raw_mut_with_typed       => (f, -, 1 st) raw_mut()     (t, 2, - st));
+    t!(raw_mut_with_both        => (t, 1, 3 st) raw_mut()     (t, 1, - st));
+    t!(raw_mut_with_invalid_raw => (f, 1, 3 st) raw_mut()     (t, 4, - st));
 
-    t!(raw_with_raw             => (t, 1, - st) raw()         (t, 1, - st))
-    t!(raw_with_typed           => (f, -, 1 st) raw()         (t, 2, 1 st))
-    t!(raw_with_both            => (t, 1, 3 st) raw()         (t, 1, 3 st))
-    t!(raw_with_invalid_raw     => (f, 1, 3 st) raw()         (t, 4, 3 st))
+    t!(raw_with_raw             => (t, 1, - st) raw()         (t, 1, - st));
+    t!(raw_with_typed           => (f, -, 1 st) raw()         (t, 2, 1 st));
+    t!(raw_with_both            => (t, 1, 3 st) raw()         (t, 1, 3 st));
+    t!(raw_with_invalid_raw     => (f, 1, 3 st) raw()         (t, 4, 3 st));
 
-    t!(set_typed_with_raw                  => (t, 1, - st) set_typed(,d3st()) (f, 1, 3 st))
-    t!(set_typed_with_typed                => (f, -, 1 st) set_typed(,d3st()) (f, -, 3 st))
-    t!(set_typed_with_other                => (f, -, 1 np) set_typed(,d3st()) (f, -, 3 st))
-    t!(set_typed_with_other_and_invalid    => (f, 1, 1 np) set_typed(,d3st()) (f, 1, 3 st))
-    t!(set_typed_with_other_and_raw        => (t, 1, 1 np) set_typed(,d3st()) (f, 1, 3 st))
+    t!(set_typed_with_raw                  => (t, 1, - st) set_typed(,d3st()) (f, 1, 3 st));
+    t!(set_typed_with_typed                => (f, -, 1 st) set_typed(,d3st()) (f, -, 3 st));
+    t!(set_typed_with_other                => (f, -, 1 np) set_typed(,d3st()) (f, -, 3 st));
+    t!(set_typed_with_other_and_invalid    => (f, 1, 1 np) set_typed(,d3st()) (f, 1, 3 st));
+    t!(set_typed_with_other_and_raw        => (t, 1, 1 np) set_typed(,d3st()) (f, 1, 3 st));
 
-    t!(typed_mut_with_raw                  => (t, 1, - st) typed_mut()/st (f, 1, 1 st))
-    t!(typed_mut_with_typed                => (f, -, 1 st) typed_mut()/st (f, -, 1 st))
-    t!(typed_mut_with_other                => (f, -, 3 np) typed_mut()/st (f, 4, 4 st))
-    t!(typed_mut_with_other_and_invalid    => (f, 1, 3 np) typed_mut()/st (f, 4, 4 st))
-    t!(typed_mut_with_other_and_raw        => (t, 1, 3 np) typed_mut()/st (f, 1, 1 st))
-    t!(typed_mut_with_other_np             => (f, -, 3 st) typed_mut()/np (f, 4, 3 st))
-    t!(typed_mut_with_other_and_invalid_np => (f, 1, 3 st) typed_mut()/np (f, 4, 3 st))
-    t!(typed_mut_with_other_and_raw_np     => (t, 1, 3 st) typed_mut()/np (f, 1, 3 st))
+    t!(typed_mut_with_raw                  => (t, 1, - st) typed_mut()/st (f, 1, 1 st));
+    t!(typed_mut_with_typed                => (f, -, 1 st) typed_mut()/st (f, -, 1 st));
+    t!(typed_mut_with_other                => (f, -, 3 np) typed_mut()/st (f, 4, 4 st));
+    t!(typed_mut_with_other_and_invalid    => (f, 1, 3 np) typed_mut()/st (f, 4, 4 st));
+    t!(typed_mut_with_other_and_raw        => (t, 1, 3 np) typed_mut()/st (f, 1, 1 st));
+    t!(typed_mut_with_other_np             => (f, -, 3 st) typed_mut()/np (f, 4, 3 st));
+    t!(typed_mut_with_other_and_invalid_np => (f, 1, 3 st) typed_mut()/np (f, 4, 3 st));
+    t!(typed_mut_with_other_and_raw_np     => (t, 1, 3 st) typed_mut()/np (f, 1, 3 st));
 
-    t!(typed_with_raw                      => (t, 1, - st) typed()/st     (t, 1, 1 st))
-    t!(typed_with_typed                    => (f, -, 1 st) typed()/st     (f, -, 1 st))
-    t!(typed_with_other                    => (f, -, 3 np) typed()/st     (t, 4, 4 st))
-    t!(typed_with_other_and_invalid        => (f, 1, 3 np) typed()/st     (t, 4, 4 st))
-    t!(typed_with_other_and_raw            => (t, 1, 3 np) typed()/st     (t, 1, 1 st))
-    t!(typed_with_other_np                 => (f, -, 3 st) typed()/np     (t, 4, 3 st))
-    t!(typed_with_other_and_invalid_np     => (f, 1, 3 st) typed()/np     (t, 4, 3 st))
-    t!(typed_with_other_and_raw_np         => (t, 1, 3 st) typed()/np     (t, 1, 3 st))
+    t!(typed_with_raw                      => (t, 1, - st) typed()/st     (t, 1, 1 st));
+    t!(typed_with_typed                    => (f, -, 1 st) typed()/st     (f, -, 1 st));
+    t!(typed_with_other                    => (f, -, 3 np) typed()/st     (t, 4, 4 st));
+    t!(typed_with_other_and_invalid        => (f, 1, 3 np) typed()/st     (t, 4, 4 st));
+    t!(typed_with_other_and_raw            => (t, 1, 3 np) typed()/st     (t, 1, 1 st));
+    t!(typed_with_other_np                 => (f, -, 3 st) typed()/np     (t, 4, 3 st));
+    t!(typed_with_other_and_invalid_np     => (f, 1, 3 st) typed()/np     (t, 4, 3 st));
+    t!(typed_with_other_and_raw_np         => (t, 1, 3 st) typed()/np     (t, 1, 3 st));
 
     macro_rules! fmtitem {
         ($e:expr) => {{
@@ -621,28 +621,28 @@ mod tests {
     }
 
     // raw = raw
-    eq!(raw_eq_raw_with_different_typed => (t, 2, 1 st) (t, 2, 1 np))
-    eq!(raw_eq_raw_with_same_typed      => (t, 2, 1 st) (t, 2, 1 st))
-    eq!(raw_eq_raw_with_one_typed       => (t, 2, 1 st) (t, 2, - st))
-    eq!(raw_eq_raw_with_neither_typed   => (t, 2, - st) (t, 2, - st))
-    ne!(raw_ne_raw_with_different_typed => (t, 2, 1 st) (t, 4, 3 np))
-    ne!(raw_ne_raw_with_same_typed      => (t, 2, 1 st) (t, 4, 3 st))
-    ne!(raw_ne_raw_with_one_typed       => (t, 2, 1 st) (t, 4, - st))
-    ne!(raw_ne_raw_with_neither_typed   => (t, 2, - st) (t, 4, - st))
+    eq!(raw_eq_raw_with_different_typed => (t, 2, 1 st) (t, 2, 1 np));
+    eq!(raw_eq_raw_with_same_typed      => (t, 2, 1 st) (t, 2, 1 st));
+    eq!(raw_eq_raw_with_one_typed       => (t, 2, 1 st) (t, 2, - st));
+    eq!(raw_eq_raw_with_neither_typed   => (t, 2, - st) (t, 2, - st));
+    ne!(raw_ne_raw_with_different_typed => (t, 2, 1 st) (t, 4, 3 np));
+    ne!(raw_ne_raw_with_same_typed      => (t, 2, 1 st) (t, 4, 3 st));
+    ne!(raw_ne_raw_with_one_typed       => (t, 2, 1 st) (t, 4, - st));
+    ne!(raw_ne_raw_with_neither_typed   => (t, 2, - st) (t, 4, - st));
 
     // raw = typed
-    eq!(raw_eq_typed_with_one_raw         => (t, 2, 3 st) (f, -, 1 st))
-    ne!(raw_ne_typed_with_one_raw         => (t, 1, 1 st) (f, -, 1 st))
-    eq!(raw_eq_typed_with_invalid_raw     => (t, 2, 3 st) (f, 3, 1 st))
-    eq!(raw_eq_typed_with_different_typed => (t, 2, 1 st) (f, -, 1 np))
+    eq!(raw_eq_typed_with_one_raw         => (t, 2, 3 st) (f, -, 1 st));
+    ne!(raw_ne_typed_with_one_raw         => (t, 1, 1 st) (f, -, 1 st));
+    eq!(raw_eq_typed_with_invalid_raw     => (t, 2, 3 st) (f, 3, 1 st));
+    eq!(raw_eq_typed_with_different_typed => (t, 2, 1 st) (f, -, 1 np));
 
     // typed = typed
-    eq!(typed_eq_typed_with_1              => (f, -, 1 st) (f, -, 1 np))
-    eq!(typed_eq_typed_with_2              => (f, -, 1 st) (f, -, 1 st))
-    eq!(typed_eq_typed_with_3              => (f, -, 1 st) (f, 2, 1 np))
-    eq!(typed_eq_typed_with_4              => (f, -, 1 st) (f, 2, 1 st))
-    eq!(typed_eq_typed_with_5              => (f, 2, 1 st) (f, -, 1 np))
-    eq!(typed_eq_typed_with_6              => (f, 2, 1 st) (f, -, 1 st))
-    eq!(typed_eq_typed_with_7              => (f, 2, 1 st) (f, 2, 1 np))
-    eq!(typed_eq_typed_with_8              => (f, 2, 1 st) (f, 2, 1 st))
+    eq!(typed_eq_typed_with_1              => (f, -, 1 st) (f, -, 1 np));
+    eq!(typed_eq_typed_with_2              => (f, -, 1 st) (f, -, 1 st));
+    eq!(typed_eq_typed_with_3              => (f, -, 1 st) (f, 2, 1 np));
+    eq!(typed_eq_typed_with_4              => (f, -, 1 st) (f, 2, 1 st));
+    eq!(typed_eq_typed_with_5              => (f, 2, 1 st) (f, -, 1 np));
+    eq!(typed_eq_typed_with_6              => (f, 2, 1 st) (f, -, 1 st));
+    eq!(typed_eq_typed_with_7              => (f, 2, 1 st) (f, 2, 1 np));
+    eq!(typed_eq_typed_with_8              => (f, 2, 1 st) (f, 2, 1 st));
 }
