@@ -8,7 +8,8 @@ use std::io::IoResult;
 use std::raw::TraitObject;
 use std::str::SendStr;
 
-use std::collections::hash_map::{HashMap, Occupied, Vacant};
+use std::collections::hash_map::HashMap;
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 
 use self::internals::Item;
 pub use self::internals::{TypedRef, RawRef};
@@ -302,7 +303,7 @@ impl<'a> Header for &'static (Header + 'static) {
 ///
 /// At this point it is worth recalling that in a request or response, there can be multiple header
 /// fields with the same name; this is why the raw representation of each header item is `Vec<Vec<u8>>`
-/// rather than `Vec<u8>` each header field can 
+/// rather than `Vec<u8>` each header field can
 /// Each header name is thus associated with an
 /// item.
 #[deriving(PartialEq)]
