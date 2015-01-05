@@ -3,6 +3,7 @@
 //! See the `Method` type for all the information your heart desires.
 use std::fmt;
 use std::mem;
+use std::cmp::Ordering;
 
 use phf::Map;
 
@@ -48,7 +49,7 @@ macro_rules! method_enum {
         ///
         /// Unregistered methods will default to not being safe and not being idempotent, but may
         /// be altered after creation if desired.
-        #[deriving(Clone, Hash)]
+        #[derive(Clone, Hash)]
         pub enum Method<'a> {
             $(#[$doc] $ident,)*
             /// A method not in the IANA HTTP method registry.
@@ -307,7 +308,7 @@ macro_rules! method_enum {
 
         impl<'a> fmt::Show for Method<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write(self.name().as_bytes())
+                f.write_str(&*self.name())
             }
         }
     }

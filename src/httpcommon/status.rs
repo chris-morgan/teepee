@@ -2,6 +2,8 @@
 
 use std::fmt;
 use std::mem::transmute;
+use std::num::{FromPrimitive, ToPrimitive};
+use std::cmp::Ordering;
 
 pub use self::StatusCode::*;
 pub use self::StatusClass::*;
@@ -1671,7 +1673,7 @@ impl PartialEq for StatusCode {
 
 impl Eq for StatusCode {}
 
-// Ditto (though #[deriving(Clone)] only takes about 0.4 seconds).
+// Ditto (though #[derive(Clone)] only takes about 0.4 seconds).
 impl Clone for StatusCode {
     #[inline]
     fn clone(&self) -> StatusCode {
@@ -1710,11 +1712,11 @@ impl Ord for StatusCode {
     #[inline]
     fn cmp(&self, other: &StatusCode) -> Ordering {
         if *self < *other {
-            Less
+            Ordering::Less
         } else if *self > *other {
-            Greater
+            Ordering::Greater
         } else {
-            Equal
+            Ordering::Equal
         }
     }
 }
@@ -1754,7 +1756,7 @@ impl ToPrimitive for StatusCode {
 ///
 /// This can be used in cases where a status code’s meaning is unknown, also,
 /// to get the appropriate *category* of status.
-#[deriving(Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
 pub enum StatusClass {
     /// 1xx (Informational): The request was received, continuing process
     Informational = 100,

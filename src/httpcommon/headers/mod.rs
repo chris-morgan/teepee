@@ -16,8 +16,8 @@ pub use self::internals::{TypedRef, RawRef};
 
 mod internals;
 
-/// The data type of an HTTP header for encoding and decoding.
-pub trait Header: Any + HeaderClone {
+/// A trait defining the parsing of a header from a raw value.
+pub trait ToHeader {
     /// Parse a header from one or more header field values, returning some value if successful or
     /// `None` if parsing fails.
     ///
@@ -26,7 +26,10 @@ pub trait Header: Any + HeaderClone {
     /// such cases, they MUST be equivalent to having them all as a comma-separated single field
     /// (RFC 7230, section 3.3.2 Field Order), with exceptions for things like dropping invalid values.
     fn parse_header(raw_field_values: &[Vec<u8>]) -> Option<Self>;
+}
 
+/// The data type of an HTTP header for encoding and decoding.
+pub trait Header: Any + HeaderClone {
     /// Introducing an `Err` value that does *not* come from the writer is incorrect behaviour and
     /// may lead to task failure in certain situations. (The primary case where this will happen is
     /// accessing a cached Box<Header> object as a different type; then, it is shoved into a buffer
@@ -115,7 +118,7 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 ///
 /// ```rust,ignore
 /// // The header data type
-/// #[deriving(Clone)]
+/// #[derive(Clone)]
 /// pub struct Foo {
 ///     ...
 /// }
@@ -138,9 +141,11 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 ///
 /// ```rust
 /// # use std;
-/// # #[deriving(Clone)] struct Foo;
-/// # impl httpcommon::headers::Header for Foo {
+/// # #[derive(Clone)] struct Foo;
+/// # impl httpcommon::headers::ToHeader for Foo {
 /// #     fn parse_header(_raw: &[Vec<u8>]) -> Option<Foo> { Some(Foo) }
+/// # }
+/// # impl httpcommon::headers::Header for Foo {
 /// #     fn fmt_header(&self, w: &mut Writer) -> std::io::IoResult<()> { Ok(()) }
 /// # }
 /// # struct FOO;
@@ -176,22 +181,12 @@ impl Clone for Box<Header + 'static> {
 }
 
 impl Header for Box<Header + 'static> {
-    fn parse_header(_raw: &[Vec<u8>]) -> Option<Box<Header + 'static>> {
-        // Dummy impl; XXX: split to ToHeader/FromHeader?
-        None
-    }
-
     fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
         (**self).fmt_header(w)
     }
 }
 
 impl<'a> Header for &'static (Header + 'static) {
-    fn parse_header(_raw: &[Vec<u8>]) -> Option<&'static (Header + 'static)> {
-        // Dummy impl; XXX: split to ToHeader/FromHeader?
-        None
-    }
-
     fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
         (**self).fmt_header(w)
     }
@@ -306,7 +301,7 @@ impl<'a> Header for &'static (Header + 'static) {
 /// rather than `Vec<u8>` each header field can
 /// Each header name is thus associated with an
 /// item.
-#[deriving(PartialEq)]
+#[derive(PartialEq)]
 pub struct Headers {
     data: HashMap<SendStr, Item>,
 }
@@ -320,7 +315,7 @@ impl Headers {
     }
 }
 
-impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
+impl<H: ToHeader + Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     /// Get a reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
@@ -329,7 +324,7 @@ impl<H: Header + Clone + 'static, M: HeaderMarker<H>> Headers {
     }
 }
 
-impl<H: Header + 'static, M: HeaderMarker<H>> Headers {
+impl<H: ToHeader + Header + 'static, M: HeaderMarker<H>> Headers {
     /// Get a mutable reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
@@ -387,7 +382,7 @@ impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let HeaderShowAdapter(h) = *self;
-        match h.fmt_header(f) {
+        match f.write_str(&*String::from_utf8(fmt_header(h)).unwrap()) {
             Ok(v) => Ok(v),
             Err(_) => Err(fmt::Error)
         }

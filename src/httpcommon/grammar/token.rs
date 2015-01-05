@@ -23,7 +23,9 @@
 //! ```
 
 use std::borrow::BorrowFrom;
+use std::cmp::Ordering;
 use std::fmt;
+use std::ops::Deref;
 use std::str;
 use self::Token::{Owned, Slice};
 
@@ -43,7 +45,7 @@ pub fn is_tchar(o: u8) -> bool {
 ///
 /// This may be either owned, corresponding to `String`/`Vec<u8>`, or a slice,
 /// corresponding to `&str`/`&[u8]`.
-#[deriving(Clone, Hash)]
+#[derive(Clone, Hash)]
 pub enum Token<'a> {
     /// A token backed by a vector (`Vec<u8>`).
     #[doc(hidden)]
@@ -61,10 +63,7 @@ pub enum Token<'a> {
 
 impl<'a> fmt::Show for Token<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Owned { ref _bytes } => f.write(_bytes.as_slice()),
-            Slice { ref _bytes } => f.write(*_bytes),
-        }
+        f.write_str(&**self)
     }
 }
 
@@ -185,7 +184,9 @@ impl<'a> Token<'a> {
     }
 }
 
-impl<'a> Deref<str> for Token<'a> {
+impl<'a> Deref for Token<'a> {
+    type Target = str;
+
     fn deref(&self) -> &str {
         self.as_str()
     }

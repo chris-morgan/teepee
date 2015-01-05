@@ -2,11 +2,12 @@
 
 use std::any::AnyRefExt;
 use std::vec::CowVec;
-use std::borrow::Cow;
+use std::borrow::{Cow, IntoCow};
+use std::ops::Deref;
 
 use mucell::{MuCell, Ref};
 
-use super::{Header, UncheckedAnyMutRefExt, UncheckedAnyRefExt, fmt_header};
+use super::{ToHeader, Header, UncheckedAnyMutRefExt, UncheckedAnyRefExt, fmt_header};
 
 /// All the header field values, raw or typed, with a shared field name.
 ///
@@ -46,7 +47,7 @@ struct Inner {
     typed: Option<Box<Header + 'static>>,
 }
 
-#[deriving(PartialEq)]
+#[derive(PartialEq)]
 pub struct Item {
     inner: MuCell<Inner>,
 }
@@ -117,7 +118,7 @@ impl Inner {
         }
     }
 
-    fn typed_mut<H: Header + 'static>(&mut self, invalidate_raw: bool) -> Option<&mut H> {
+    fn typed_mut<H: ToHeader + Header + 'static>(&mut self, invalidate_raw: bool) -> Option<&mut H> {
         match self.typed {
             None => {
                 debug_assert_eq!(self.raw_valid, true);
@@ -125,7 +126,7 @@ impl Inner {
                 if invalidate_raw {
                     self.raw_valid = false;
                 }
-                let h: Option<H> = Header::parse_header(self.raw.as_ref().unwrap().as_slice());
+                let h: Option<H> = ToHeader::parse_header(self.raw.as_ref().unwrap().as_slice());
                 match h {
                     Some(h) => {
                         self.typed = Some(box h as Box<Header + 'static>);
@@ -155,7 +156,7 @@ impl Inner {
                 } else if invalidate_raw {
                     self.raw_valid = false;
                 }
-                let otyped: Option<H> = Header::parse_header(self.raw.as_ref().unwrap().as_slice());
+                let otyped: Option<H> = ToHeader::parse_header(self.raw.as_ref().unwrap().as_slice());
                 match otyped {
                     Some(typed) => {
                         *h = box typed as Box<Header + 'static>;
@@ -169,13 +170,13 @@ impl Inner {
 
     // Pass `false` to convert_if_necessary if `typed_mut` was called with the same `H`
     // immediately before; otherwise pass `true`.
-    fn typed_cow<H: Header + Clone + 'static>(&self, convert_if_necessary: bool) -> Option<Cow<H, H>> {
+    fn typed_cow<H: ToHeader + Header + Clone + 'static>(&self, convert_if_necessary: bool) -> Option<Cow<H, H>> {
         match self.typed {
             Some(ref h) if h.is::<H>() => {
                 Some(unsafe { Cow::Borrowed(h.downcast_ref_unchecked::<H>()) })
             },
             _ if convert_if_necessary => {
-                Header::parse_header(self.raw_cow()[]).map(|x| Cow::Owned(x))
+                ToHeader::parse_header(self.raw_cow()[]).map(|x| Cow::Owned(x))
             },
             _ => None,
         }
@@ -186,7 +187,7 @@ impl Inner {
 mucell_ref_type! {
     //#[doc = "TODO"]
     struct RawRef<'a>(Inner)
-    impl Deref<[Vec<u8>]>
+    impl Deref -> [Vec<u8>]
     data: CowVec<'a, Vec<u8>> = |x| x.raw_cow()
 }
 
@@ -202,18 +203,18 @@ impl<'a> RawRef<'a> {
 //mucell_ref_type! {
 //    //#[doc = "TODO"]
 //    struct TypedRef<'a, T: 'static>(Inner)
-//    impl Deref<T>
+//    impl Deref -> T
 //    data: Cow<'a, T, &'a T> = |x| x.typed_cow()
 //}
 
 /// An immutable reference to a `MuCell`. Dereference to get at the object.
 //$(#[$attr])*
-pub struct TypedRef<'a, H: Header + Clone + 'static> {
+pub struct TypedRef<'a, H: ToHeader + Header + Clone + 'static> {
     _parent: Ref<'a, Inner>,
     _data: Cow<'a, H, H>,
 }
 
-impl<'a, H: Header + Clone + 'static> TypedRef<'a, H> {
+impl<'a, H: ToHeader + Header + Clone + 'static> TypedRef<'a, H> {
     /// Construct a reference from the cell.
     fn from(cell: &'a MuCell<Inner>, convert_if_necessary: bool) -> Option<TypedRef<'a, H>> {
         let parent = cell.borrow();
@@ -229,13 +230,14 @@ impl<'a, H: Header + Clone + 'static> TypedRef<'a, H> {
 }
 
 #[unstable = "trait is not stable"]
-impl<'a, H: Header + Clone + 'static> Deref<H> for TypedRef<'a, H> {
+impl<'a, H: ToHeader + Header + Clone + 'static> Deref for TypedRef<'a, H> {
+    type Target = H;
     fn deref<'b>(&'b self) -> &'b H {
         &*self._data
     }
 }
 
-impl<'a, H: Header + Clone + 'static> TypedRef<'a, H> {
+impl<'a, H: ToHeader + Header + Clone + 'static> TypedRef<'a, H> {
     /// Extract the owned data.
     ///
     /// Copies the data if it is not already owned.
@@ -315,7 +317,7 @@ impl Item {
     /// fashion, it will be produced from the typed form.
     ///
     /// Only use this if you need to mutate the typed form; if you don't, use `typed`.
-    pub fn typed_mut<H: Header + 'static>(&mut self) -> Option<&mut H> {
+    pub fn typed_mut<H: ToHeader + Header + 'static>(&mut self) -> Option<&mut H> {
         self.inner.borrow_mut().typed_mut(true)
     }
 
@@ -329,7 +331,7 @@ impl Item {
     /// can dereference to get your typed reference.
     ///
     /// See also `typed_mut`, if you wish to mutate the typed representation.
-    pub fn typed<H: Header + Clone + 'static>(&self) -> Option<TypedRef<H>> {
+    pub fn typed<H: ToHeader + Header + Clone + 'static>(&self) -> Option<TypedRef<H>> {
         let convert_if_necessary = self.inner.try_mutate(|inner| {
             let _ = inner.typed_mut::<H>(false);
         });
@@ -359,7 +361,7 @@ impl Inner {
 #[allow(unused_mut)]
 mod tests {
     use super::{Item, Inner};
-    use super::super::Header;
+    use super::super::{ToHeader, Header};
     use std::fmt;
     use std::any::AnyRefExt;
     use std::io::IoResult;
@@ -377,16 +379,18 @@ mod tests {
         Item { inner: MuCell::new(item) }
     }
 
-    #[deriving(PartialEq, Eq, Clone, Show)]
+    #[derive(PartialEq, Eq, Clone, Show)]
     struct StrongType(Vec<Vec<u8>>);
     #[allow(non_camel_case_types)]
     type st = StrongType;
 
-    impl Header for StrongType {
+    impl ToHeader for StrongType {
         fn parse_header(raw: &[Vec<u8>]) -> Option<StrongType> {
             Some(StrongType(raw.iter().map(|x| x.clone()).collect()))
         }
+    }
 
+    impl Header for StrongType {
         fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
             let StrongType(ref vec) = *self;
             let mut first = true;
@@ -401,16 +405,18 @@ mod tests {
         }
     }
 
-    #[deriving(PartialEq, Eq, Clone, Show)]
+    #[derive(PartialEq, Eq, Clone, Show)]
     struct NonParsingStrongType(StrongType);
     #[allow(non_camel_case_types)]
     type np = NonParsingStrongType;
 
-    impl Header for NonParsingStrongType {
+    impl ToHeader for NonParsingStrongType {
         fn parse_header(_raw: &[Vec<u8>]) -> Option<NonParsingStrongType> {
             None
         }
+    }
 
+    impl Header for NonParsingStrongType {
         fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
             let NonParsingStrongType(ref st) = *self;
             st.fmt_header(w)
