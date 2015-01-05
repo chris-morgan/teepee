@@ -117,6 +117,10 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 /// Standard usage of this is very simple unit-struct marker types, like this:
 ///
 /// ```rust,ignore
+/// use std::borrow::IntoCow;
+/// use std::str::SendStr;
+/// use httpcommon::headers::{Header, HeaderMarker};
+///
 /// // The header data type
 /// #[derive(Clone)]
 /// pub struct Foo {
@@ -132,7 +136,7 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 ///
 /// impl HeaderMarker<Foo> for FOO {
 ///     fn header_name(&self) -> SendStr {
-///         Slice("foo")
+///         "foo".into_cow()
 ///     }
 /// }
 /// ```
@@ -141,6 +145,7 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 ///
 /// ```rust
 /// # use std;
+/// # use std::borrow::IntoCow;
 /// # #[derive(Clone)] struct Foo;
 /// # impl httpcommon::headers::ToHeader for Foo {
 /// #     fn parse_header(_raw: &[Vec<u8>]) -> Option<Foo> { Some(Foo) }
