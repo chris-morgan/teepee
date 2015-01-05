@@ -117,6 +117,7 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 /// Standard usage of this is very simple unit-struct marker types, like this:
 ///
 /// ```rust,ignore
+/// #![feature(associated_types)]
 /// use std::borrow::IntoCow;
 /// use std::str::SendStr;
 /// use httpcommon::headers::{Header, HeaderMarker};
@@ -134,7 +135,8 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 /// // The marker type for accessing the header and specifying the name
 /// pub struct FOO;
 ///
-/// impl HeaderMarker<Foo> for FOO {
+/// impl HeaderMarker for FOO {
+///     type Output = Foo;
 ///     fn header_name(&self) -> SendStr {
 ///         "foo".into_cow()
 ///     }
@@ -144,7 +146,8 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 /// Then, accessing the header is done like this:
 ///
 /// ```rust
-/// # use std;
+/// # #![feature(associated_types)]
+/// # extern crate httpcommon;
 /// # use std::borrow::IntoCow;
 /// # #[derive(Clone)] struct Foo;
 /// # impl httpcommon::headers::ToHeader for Foo {
@@ -154,24 +157,25 @@ impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
 /// #     fn fmt_header(&self, w: &mut Writer) -> std::io::IoResult<()> { Ok(()) }
 /// # }
 /// # struct FOO;
-/// # impl httpcommon::headers::HeaderMarker<Foo> for FOO {
+/// # impl httpcommon::headers::HeaderMarker for FOO {
+/// #     type Output = Foo;
 /// #     fn header_name(&self) -> std::str::SendStr { "foo".into_cow() }
 /// # }
 /// # struct Request { headers: httpcommon::headers::Headers }
+/// # fn main() {
 /// # let mut request = Request { headers: httpcommon::headers::Headers::new() };
 /// # request.headers.set(FOO, Foo);
 /// // Of course, this is assuming that we *know* the header is there
 /// let foo = request.headers.get(FOO).unwrap().into_owned();
 /// request.headers.set(FOO, foo);
+/// # }
 /// ```
 ///
 /// And lo! `foo` is a `Foo` object corresponding to the `foo` (or `Foo`, or `fOO`, &c.) header in
 /// the request.
-///
-/// Authors are strongly advised that they should not implement `HeaderMarker<T>` for more than one
-/// `T` on the same type; as well as going against the spirit of things, it would also require
-/// explicit type specifiation every time, which would be a nuisance.
-pub trait HeaderMarker<OutputType: Header + 'static> {
+pub trait HeaderMarker {
+    type Output: ToHeader + Header + Clone + 'static;
+
     /// The name of the header that shall be used for retreiving and setting.
     ///
     /// Normally this will be a static string, but occasionally it may be necessary to define it at
@@ -320,25 +324,23 @@ impl Headers {
     }
 }
 
-impl<H: ToHeader + Header + Clone + 'static, M: HeaderMarker<H>> Headers {
+impl<M: HeaderMarker> Headers {
     /// Get a reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get(&self, header_marker: M) -> Option<TypedRef<H>> {
-        self.data.get(&header_marker.header_name()).and_then(|item| item.typed::<H>())
+    pub fn get(&self, header_marker: M) -> Option<TypedRef<M::Output>> {
+        self.data.get(&header_marker.header_name()).and_then(|item| item.typed())
     }
-}
 
-impl<H: ToHeader + Header + 'static, M: HeaderMarker<H>> Headers {
     /// Get a mutable reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get_mut(&mut self, header_marker: M) -> Option<&mut H> {
-        self.data.get_mut(&header_marker.header_name()).and_then(|item| item.typed_mut::<H>())
+    pub fn get_mut(&mut self, header_marker: M) -> Option<&mut M::Output> {
+        self.data.get_mut(&header_marker.header_name()).and_then(|item| item.typed_mut())
     }
 
     /// Set the named header to the given value.
-    pub fn set(&mut self, header_marker: M, value: H) {
+    pub fn set(&mut self, header_marker: M, value: M::Output) {
         match self.data.entry(header_marker.header_name()) {
             Vacant(entry) => { let _ = entry.set(Item::from_typed(value)); },
             Occupied(entry) => entry.into_mut().set_typed(value),
