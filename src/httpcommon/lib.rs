@@ -22,6 +22,9 @@ extern crate phf;
 #[phase(plugin, link)]
 extern crate mucell;
 
+#[phase(plugin, link)]
+extern crate mopa;
+
 pub mod method;
 pub mod status;
 pub mod headers;

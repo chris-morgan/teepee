@@ -7,7 +7,7 @@ use std::ops::Deref;
 
 use mucell::{MuCell, Ref};
 
-use super::{ToHeader, Header, UncheckedAnyMutRefExt, UncheckedAnyRefExt, fmt_header};
+use super::{ToHeader, Header, fmt_header};
 
 /// All the header field values, raw or typed, with a shared field name.
 ///

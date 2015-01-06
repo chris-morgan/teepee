@@ -1,11 +1,8 @@
 //! HTTP headers.
 
-use std::any::{AnyRefExt, Any};
-use std::mem::transmute;
-use std::intrinsics::TypeId;
+use std::any::Any;
 use std::fmt;
 use std::io::IoResult;
-use std::raw::TraitObject;
 use std::str::SendStr;
 
 use std::collections::hash_map::HashMap;
@@ -38,6 +35,8 @@ pub trait Header: Any + HeaderClone {
     fn fmt_header(&self, writer: &mut Writer) -> IoResult<()>;
 }
 
+mopafy!(Header);
+
 /// `Clone`, but producing boxed headers.
 #[doc(hidden)]
 pub trait HeaderClone {
@@ -49,66 +48,6 @@ pub trait HeaderClone {
 impl<T: Header + Clone + 'static> HeaderClone for T {
     fn clone_boxed(&self) -> Box<Header + 'static> {
         box self.clone()
-    }
-}
-
-// impl copied from std::any. Not especially nice, sorry :-(
-impl<'a> AnyRefExt<'a> for &'a Header {
-    #[inline]
-    fn is<T: 'static>(self) -> bool {
-        // Get TypeId of the type this function is instantiated with
-        let t = TypeId::of::<T>();
-
-        // Get TypeId of the type in the trait object
-        let boxed = self.get_type_id();
-
-        // Compare both TypeIds on equality
-        t == boxed
-    }
-
-    #[inline]
-    fn downcast_ref<T: 'static>(self) -> Option<&'a T> {
-        if self.is::<T>() {
-            Some(unsafe { self.downcast_ref_unchecked() })
-        } else {
-            None
-        }
-    }
-}
-
-/// An extension of `AnyRefExt` allowing unchecked downcasting of trait objects to `&T`.
-trait UncheckedAnyRefExt<'a> {
-    /// Returns a reference to the boxed value, assuming that it is of type `T`. This should only be
-    /// called if you are ABSOLUTELY CERTAIN of `T` as you will get really wacky output if it’s not.
-    unsafe fn downcast_ref_unchecked<T: 'static>(self) -> &'a T;
-}
-
-impl<'a> UncheckedAnyRefExt<'a> for &'a Header {
-    #[inline]
-    unsafe fn downcast_ref_unchecked<T: 'static>(self) -> &'a T {
-        // Get the raw representation of the trait object
-        let to: TraitObject = transmute(self);
-
-        // Extract the data pointer
-        transmute(to.data)
-    }
-}
-
-/// An extension of `AnyMutRefExt` allowing unchecked downcasting of trait objects to `&mut T`.
-trait UncheckedAnyMutRefExt<'a> {
-    /// Returns a reference to the boxed value, assuming that it is of type `T`. This should only be
-    /// called if you are ABSOLUTELY CERTAIN of `T` as you will get really wacky output if it’s not.
-    unsafe fn downcast_mut_unchecked<T: 'static>(self) -> &'a mut T;
-}
-
-impl<'a> UncheckedAnyMutRefExt<'a> for &'a mut Header {
-    #[inline]
-    unsafe fn downcast_mut_unchecked<T: 'static>(self) -> &'a mut T {
-        // Get the raw representation of the trait object
-        let to: TraitObject = transmute(self);
-
-        // Extract the data pointer
-        transmute(to.data)
     }
 }
 
