@@ -1,6 +1,5 @@
 //! The internals of header representation. That is: `Item`.
 
-use std::any::AnyRefExt;
 use std::vec::CowVec;
 use std::borrow::{Cow, IntoCow};
 use std::ops::Deref;
@@ -363,7 +362,6 @@ mod tests {
     use super::{Item, Inner};
     use super::super::{ToHeader, Header};
     use std::fmt;
-    use std::any::AnyRefExt;
     use std::io::IoResult;
     use mucell::MuCell;
 

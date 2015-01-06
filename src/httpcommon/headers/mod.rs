@@ -3,7 +3,7 @@
 use std::any::Any;
 use std::fmt;
 use std::io::IoResult;
-use std::str::SendStr;
+use std::string::CowString;
 
 use std::collections::hash_map::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
@@ -58,7 +58,7 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 /// ```rust,ignore
 /// #![feature(associated_types)]
 /// use std::borrow::IntoCow;
-/// use std::str::SendStr;
+/// use std::string::CowString;
 /// use httpcommon::headers::{Header, HeaderMarker};
 ///
 /// // The header data type
@@ -76,7 +76,7 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 ///
 /// impl HeaderMarker for FOO {
 ///     type Output = Foo;
-///     fn header_name(&self) -> SendStr {
+///     fn header_name(&self) -> CowString<'static> {
 ///         "foo".into_cow()
 ///     }
 /// }
@@ -98,7 +98,7 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 /// # struct FOO;
 /// # impl httpcommon::headers::HeaderMarker for FOO {
 /// #     type Output = Foo;
-/// #     fn header_name(&self) -> std::str::SendStr { "foo".into_cow() }
+/// #     fn header_name(&self) -> std::string::CowString<'static> { "foo".into_cow() }
 /// # }
 /// # struct Request { headers: httpcommon::headers::Headers }
 /// # fn main() {
@@ -119,7 +119,7 @@ pub trait HeaderMarker {
     ///
     /// Normally this will be a static string, but occasionally it may be necessary to define it at
     /// runtime, for dynamic header handling.
-    fn header_name(&self) -> SendStr;
+    fn header_name(&self) -> CowString<'static>;
 }
 
 impl Clone for Box<Header + 'static> {
@@ -251,7 +251,7 @@ impl<'a> Header for &'static (Header + 'static) {
 /// item.
 #[derive(PartialEq)]
 pub struct Headers {
-    data: HashMap<SendStr, Item>,
+    data: HashMap<CowString<'static>, Item>,
 }
 
 impl Headers {
@@ -280,8 +280,8 @@ impl<M: HeaderMarker> Headers {
 
     /// Set the named header to the given value.
     pub fn set(&mut self, header_marker: M, value: M::Output) {
-        match self.data.entry(header_marker.header_name()) {
-            Vacant(entry) => { let _ = entry.set(Item::from_typed(value)); },
+        match self.data.entry(&header_marker.header_name()) {
+            Vacant(entry) => { let _ = entry.insert(Item::from_typed(value)); },
             Occupied(entry) => entry.into_mut().set_typed(value),
         }
     }
@@ -307,8 +307,8 @@ impl<M: HeaderMarker> Headers {
     /// This invalidates the typed representation.
     #[inline]
     pub fn set_raw(&mut self, header_marker: M, value: Vec<Vec<u8>>) {
-        match self.data.entry(header_marker.header_name()) {
-            Vacant(entry) => { let _ = entry.set(Item::from_raw(value)); },
+        match self.data.entry(&header_marker.header_name()) {
+            Vacant(entry) => { let _ = entry.insert(Item::from_raw(value)); },
             Occupied(entry) => entry.into_mut().set_raw(value),
         }
     }
