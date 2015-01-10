@@ -47,7 +47,7 @@ pub trait HeaderClone {
 
 impl<T: Header + Clone + 'static> HeaderClone for T {
     fn clone_boxed(&self) -> Box<Header + 'static> {
-        box self.clone()
+        Box::new(self.clone())
     }
 }
 
@@ -56,7 +56,6 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 /// Standard usage of this is very simple unit-struct marker types, like this:
 ///
 /// ```rust,ignore
-/// #![feature(associated_types)]
 /// use std::borrow::IntoCow;
 /// use std::string::CowString;
 /// use httpcommon::headers::{Header, HeaderMarker};
@@ -85,7 +84,6 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 /// Then, accessing the header is done like this:
 ///
 /// ```rust
-/// # #![feature(associated_types)]
 /// # extern crate httpcommon;
 /// # use std::borrow::IntoCow;
 /// # #[derive(Clone)] struct Foo;
@@ -261,26 +259,26 @@ impl Headers {
             data: HashMap::new(),
         }
     }
-}
 
-impl<M: HeaderMarker> Headers {
     /// Get a reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get(&self, header_marker: M) -> Option<TypedRef<M::Output>> {
+    pub fn get<M: HeaderMarker>(&self, header_marker: M) -> Option<TypedRef<M::Output>> {
         self.data.get(&header_marker.header_name()).and_then(|item| item.typed())
     }
 
     /// Get a mutable reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get_mut(&mut self, header_marker: M) -> Option<&mut M::Output> {
+    pub fn get_mut<M: HeaderMarker>(&mut self, header_marker: M) -> Option<&mut M::Output>
+    where M::Output: 'static {
         self.data.get_mut(&header_marker.header_name()).and_then(|item| item.typed_mut())
     }
 
     /// Set the named header to the given value.
-    pub fn set(&mut self, header_marker: M, value: M::Output) {
-        match self.data.entry(&header_marker.header_name()) {
+    pub fn set<M: HeaderMarker>(&mut self, header_marker: M, value: M::Output)
+    where M::Output: 'static {
+        match self.data.entry(header_marker.header_name()) {
             Vacant(entry) => { let _ = entry.insert(Item::from_typed(value)); },
             Occupied(entry) => entry.into_mut().set_typed(value),
         }
@@ -290,7 +288,8 @@ impl<M: HeaderMarker> Headers {
     ///
     /// The returned value is a slice of each header field value.
     #[inline]
-    pub fn get_raw(&self, header_marker: M) -> Option<RawRef> {
+    pub fn get_raw<M: HeaderMarker>(&self, header_marker: M) -> Option<RawRef>
+    where M::Output: 'static {
         self.data.get(&header_marker.header_name()).map(|item| item.raw())
     }
 
@@ -298,7 +297,8 @@ impl<M: HeaderMarker> Headers {
     ///
     /// The returned vector contains each header field value.
     #[inline]
-    pub fn get_raw_mut(&mut self, header_marker: M) -> Option<&mut Vec<Vec<u8>>> {
+    pub fn get_raw_mut<M: HeaderMarker>(&mut self, header_marker: M) -> Option<&mut Vec<Vec<u8>>>
+    where M::Output: 'static {
         self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_mut())
     }
 
@@ -306,8 +306,9 @@ impl<M: HeaderMarker> Headers {
     ///
     /// This invalidates the typed representation.
     #[inline]
-    pub fn set_raw(&mut self, header_marker: M, value: Vec<Vec<u8>>) {
-        match self.data.entry(&header_marker.header_name()) {
+    pub fn set_raw<M: HeaderMarker>(&mut self, header_marker: M, value: Vec<Vec<u8>>)
+    where M::Output: 'static {
+        match self.data.entry(header_marker.header_name()) {
             Vacant(entry) => { let _ = entry.insert(Item::from_raw(value)); },
             Occupied(entry) => entry.into_mut().set_raw(value),
         }
@@ -315,7 +316,8 @@ impl<M: HeaderMarker> Headers {
 
     /// Remove a header from the collection.
     /// Returns true if the named header was present.
-    pub fn remove(&mut self, header_marker: &M) -> bool {
+    pub fn remove<M: HeaderMarker>(&mut self, header_marker: &M) -> bool
+    where M::Output: 'static {
         self.data.remove(&header_marker.header_name()).is_some()
     }
 }
@@ -362,7 +364,7 @@ mod tests {
         assert_eq!(headers.get(EXPIRES), None);
 
         headers.set(EXPIRES, Past);
-        assert_eq!(headers.mostly_get(&EXPIRES), &mut Typed(box Past));
+        assert_eq!(headers.mostly_get(&EXPIRES), &mut Typed(Box::new(Past)));
         expect(headers.get(EXPIRES), Past, b"0");
         assert_eq!(headers.get_raw("expires"), vec![vec![b'0']]);
         expect(headers.get(EXPIRES), Past, b"0");

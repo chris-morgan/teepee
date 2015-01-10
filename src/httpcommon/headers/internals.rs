@@ -58,13 +58,13 @@ impl PartialEq for Inner {
              &Inner { raw_valid: true, raw: Some(ref other_v), .. }) => self_v == other_v,
 
             (&Inner { raw_valid: true, raw: Some(ref self_v), .. },
-             &Inner { typed: Some(ref other_h), .. }) => match self_v[] {
+             &Inner { typed: Some(ref other_h), .. }) => match &self_v[] {
                 [ref self_v_line] => self_v_line == &fmt_header(other_h),
                 _ => false,
             },
 
             (&Inner { typed: Some(ref self_h), .. },
-             &Inner { raw_valid: true, raw: Some(ref other_v), .. }) => match other_v[] {
+             &Inner { raw_valid: true, raw: Some(ref other_v), .. }) => match &other_v[] {
                 [ref other_v_line] => other_v_line == &fmt_header(self_h),
                 _ => false,
             },
@@ -84,12 +84,12 @@ impl Inner {
         } else {
             self.raw_valid = true;
             match (&mut self.raw, &mut self.typed) {
-                (&Some(ref mut raw), &Some(ref typed)) => {
+                (&mut Some(ref mut raw), &mut Some(ref typed)) => {
                     raw.truncate(1);
                     raw.as_mut_slice()[0] = fmt_header(typed);
                 },
 
-                (ref mut raw @ &None, &Some(ref typed)) => {
+                (ref mut raw @ &mut None, &mut Some(ref typed)) => {
                     **raw = Some(vec![fmt_header(typed)]);
                 },
 
@@ -128,7 +128,7 @@ impl Inner {
                 let h: Option<H> = ToHeader::parse_header(self.raw.as_ref().unwrap().as_slice());
                 match h {
                     Some(h) => {
-                        self.typed = Some(box h as Box<Header + 'static>);
+                        self.typed = Some(Box::new(h) as Box<Header + 'static>);
                         Some(unsafe { self.typed.as_mut().unwrap().downcast_mut_unchecked::<H>() })
                     },
                     None => None,
@@ -158,7 +158,7 @@ impl Inner {
                 let otyped: Option<H> = ToHeader::parse_header(self.raw.as_ref().unwrap().as_slice());
                 match otyped {
                     Some(typed) => {
-                        *h = box typed as Box<Header + 'static>;
+                        *h = Box::new(typed) as Box<Header + 'static>;
                         Some(unsafe { h.downcast_mut_unchecked::<H>() })
                     },
                     None => None,
@@ -175,7 +175,7 @@ impl Inner {
                 Some(unsafe { Cow::Borrowed(h.downcast_ref_unchecked::<H>()) })
             },
             _ if convert_if_necessary => {
-                ToHeader::parse_header(self.raw_cow()[]).map(|x| Cow::Owned(x))
+                ToHeader::parse_header(&*self.raw_cow()).map(|x| Cow::Owned(x))
             },
             _ => None,
         }
@@ -185,8 +185,8 @@ impl Inner {
 
 mucell_ref_type! {
     //#[doc = "TODO"]
-    struct RawRef<'a>(Inner)
-    impl Deref -> [Vec<u8>]
+    struct RawRef<'a>(Inner),
+    impl Deref -> [Vec<u8>],
     data: CowVec<'a, Vec<u8>> = |x| x.raw_cow()
 }
 
@@ -201,8 +201,8 @@ impl<'a> RawRef<'a> {
 
 //mucell_ref_type! {
 //    //#[doc = "TODO"]
-//    struct TypedRef<'a, T: 'static>(Inner)
-//    impl Deref -> T
+//    struct TypedRef<'a, T: 'static>(Inner),
+//    impl Deref -> T,
 //    data: Cow<'a, T, &'a T> = |x| x.typed_cow()
 //}
 
@@ -268,7 +268,7 @@ impl Item {
             inner: MuCell::new(Inner {
                 raw_valid: false,
                 raw: None,
-                typed: Some(box typed as Box<Header + 'static>),
+                typed: Some(Box::new(typed) as Box<Header + 'static>),
             }),
         }
     }
@@ -343,7 +343,7 @@ impl Item {
     pub fn set_typed<H: Header + 'static>(&mut self, value: H) {
         let inner = self.inner.borrow_mut();
         inner.raw_valid = false;
-        inner.typed = Some(box value as Box<Header + 'static>);
+        inner.typed = Some(Box::new(value) as Box<Header + 'static>);
     }
 }
 
@@ -371,7 +371,7 @@ mod tests {
         let item = Inner {
             raw_valid: raw_valid,
             raw: raw,
-            typed: typed.map(|h| box h as Box<Header + 'static>),
+            typed: typed.map(|h| Box::new(h) as Box<Header + 'static>),
         };
         item.assert_invariants();
         Item { inner: MuCell::new(item) }
@@ -588,7 +588,7 @@ mod tests {
                 Some(ref t) => Some(super::super::fmt_header(t)),
                 None => None,
             };
-            format!("Item {{ raw_valid: {}, raw: {}, typed: {} }}", item.raw_valid, item.raw,
+            format!("Item {{ raw_valid: {:?}, raw: {:?}, typed: {:?} }}", item.raw_valid, item.raw,
                     typed)
         }}
     }

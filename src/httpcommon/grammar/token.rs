@@ -61,9 +61,15 @@ pub enum Token<'a> {
     },
 }
 
+impl<'a> fmt::String for Token<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::String::fmt(self.as_str(), f)
+    }
+}
+
 impl<'a> fmt::Show for Token<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&**self)
+        fmt::Show::fmt(self.as_str(), f)
     }
 }
 
@@ -93,7 +99,7 @@ impl<'a> Eq for Token<'a> { }
 impl<'a> Token<'a> {
     /// The number of bytes in the token.
     #[inline]
-    pub fn len(&self) -> uint {
+    pub fn len(&self) -> usize {
         self.as_bytes().len()
     }
 
@@ -178,8 +184,8 @@ impl<'a> Token<'a> {
     #[inline]
     pub fn as_bytes(&self) -> &[u8] {
         match *self {
-            Owned { ref _bytes } => _bytes.as_slice(),
-            Slice { ref _bytes } => _bytes.as_slice(),
+            Owned { ref _bytes } => &**_bytes,
+            Slice { _bytes } => _bytes,
         }
     }
 }
