@@ -1655,14 +1655,14 @@ impl Copy for StatusCode {}
 /// assert_eq!(format!("{}", ImATeapot as u16).as_slice(), "418");
 /// assert_eq!(format!("{}", Code123 as u16).as_slice(), "123");
 /// ```
-impl fmt::String for StatusCode {
+impl fmt::Display for StatusCode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} {}", *self as u16,
                self.canonical_reason().unwrap_or("<unknown status code>"))
     }
 }
 
-impl fmt::Show for StatusCode {
+impl fmt::Debug for StatusCode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(match *self {
             Continue => "Continue",

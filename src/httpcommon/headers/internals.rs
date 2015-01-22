@@ -377,7 +377,7 @@ mod tests {
         Item { inner: MuCell::new(item) }
     }
 
-    #[derive(PartialEq, Eq, Clone, Show)]
+    #[derive(PartialEq, Eq, Clone, Debug)]
     struct StrongType(Vec<Vec<u8>>);
     #[allow(non_camel_case_types)]
     type st = StrongType;
@@ -403,7 +403,7 @@ mod tests {
         }
     }
 
-    #[derive(PartialEq, Eq, Clone, Show)]
+    #[derive(PartialEq, Eq, Clone, Debug)]
     struct NonParsingStrongType(StrongType);
     #[allow(non_camel_case_types)]
     type np = NonParsingStrongType;
@@ -421,7 +421,7 @@ mod tests {
         }
     }
 
-    fn assert_headers_eq<H: Header + Clone + PartialEq + fmt::Show + 'static>(item: &Item, other: &Item) {
+    fn assert_headers_eq<H: Header + Clone + PartialEq + fmt::Debug + 'static>(item: &Item, other: &Item) {
         let item = item.inner.borrow();
         let other = other.inner.borrow();
         item.assert_invariants();

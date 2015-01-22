@@ -322,15 +322,14 @@ impl Headers {
     }
 }
 
-/// An adapter which provides `std::fmt::Show` as equivalent to `Header.fmt_header`, so that you can
+/// An adapter which provides `std::fmt::Display` as equivalent to `Header.fmt_header`, so that you can
 /// actually *use* the thing.
-pub struct HeaderShowAdapter<'a, H: 'a>(pub &'a H);
+pub struct HeaderDisplayAdapter<'a, H: 'a>(pub &'a H);
 
-impl<'a, H: Header> fmt::Show for HeaderShowAdapter<'a, H> {
+impl<'a, H: Header> fmt::Display for HeaderDisplayAdapter<'a, H> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let HeaderShowAdapter(h) = *self;
-        match f.write_str(&*String::from_utf8(fmt_header(h)).unwrap()) {
+        match f.write_str(&*String::from_utf8(fmt_header(self.0)).unwrap()) {
             Ok(v) => Ok(v),
             Err(_) => Err(fmt::Error)
         }
@@ -351,7 +350,7 @@ pub fn fmt_header<H: Header>(h: &H) -> Vec<u8> {
 mod tests {
     use super::*;
 
-    fn expect<H: Header + std::fmt::Show + Eq>(h: Option<H>, h_expected: H, raw: &[u8]) {
+    fn expect<H: Header + std::fmt::Display + Eq>(h: Option<H>, h_expected: H, raw: &[u8]) {
         let h = h.unwrap();
         assert_eq!(fmt_header(&h).as_slice(), raw);
         assert_eq!(h, h_expected);

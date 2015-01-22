@@ -306,13 +306,13 @@ macro_rules! method_enum {
             }
         }
 
-        impl<'a> fmt::String for Method<'a> {
+        impl<'a> fmt::Display for Method<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.write_str(&*self.name())
             }
         }
 
-        impl<'a> fmt::Show for Method<'a> {
+        impl<'a> fmt::Debug for Method<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match *self {
                     $($ident => write!(f, stringify!($ident)),)*
