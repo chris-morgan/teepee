@@ -2,7 +2,7 @@
 
 use std::any::Any;
 use std::fmt;
-use std::io::IoResult;
+use std::old_io::IoResult;
 use std::string::CowString;
 
 use std::collections::hash_map::HashMap;
@@ -91,7 +91,7 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 /// #     fn parse_header(_raw: &[Vec<u8>]) -> Option<Foo> { Some(Foo) }
 /// # }
 /// # impl httpcommon::headers::Header for Foo {
-/// #     fn fmt_header(&self, w: &mut Writer) -> std::io::IoResult<()> { Ok(()) }
+/// #     fn fmt_header(&self, w: &mut Writer) -> std::old_io::IoResult<()> { Ok(()) }
 /// # }
 /// # struct FOO;
 /// # impl httpcommon::headers::HeaderMarker for FOO {
