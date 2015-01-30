@@ -362,7 +362,7 @@ mod tests {
     use super::{Item, Inner};
     use super::super::{ToHeader, Header};
     use std::fmt;
-    use std::io::IoResult;
+    use std::old_io::IoResult;
     use mucell::MuCell;
 
     fn mkitem<H: Header + 'static>(raw_valid: bool,
@@ -394,9 +394,9 @@ mod tests {
             let mut first = true;
             for field in vec.iter() {
                 if !first {
-                    try!(w.write(b", "));
+                    try!(w.write_all(b", "));
                 }
-                try!(w.write(field.as_slice()));
+                try!(w.write_all(field.as_slice()));
                 first = false;
             }
             Ok(())
