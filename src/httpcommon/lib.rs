@@ -11,9 +11,9 @@
        html_root_url = "http://www.rust-ci.org/teepee/teepee/doc/")]
 
 #![feature(slicing_syntax, unsafe_destructor, plugin, core, hash, std_misc)]
+#![cfg_attr(test, feature(io))]
 
 #![warn(non_upper_case_globals, unused_typecasts, missing_docs, unused_results)]
-//#![warn(unstable)]
 
 #[plugin] #[no_link]
 extern crate phf_mac;
