@@ -1,6 +1,5 @@
 //! The internals of header representation. That is: `Item`.
 
-use std::vec::CowVec;
 use std::borrow::{Cow, IntoCow};
 use std::ops::Deref;
 
@@ -58,13 +57,13 @@ impl PartialEq for Inner {
              &Inner { raw_valid: true, raw: Some(ref other_v), .. }) => self_v == other_v,
 
             (&Inner { raw_valid: true, raw: Some(ref self_v), .. },
-             &Inner { typed: Some(ref other_h), .. }) => match &self_v[] {
+             &Inner { typed: Some(ref other_h), .. }) => match &self_v[..] {
                 [ref self_v_line] => self_v_line == &fmt_header(other_h),
                 _ => false,
             },
 
             (&Inner { typed: Some(ref self_h), .. },
-             &Inner { raw_valid: true, raw: Some(ref other_v), .. }) => match &other_v[] {
+             &Inner { raw_valid: true, raw: Some(ref other_v), .. }) => match &other_v[..] {
                 [ref other_v_line] => other_v_line == &fmt_header(self_h),
                 _ => false,
             },
@@ -103,10 +102,10 @@ impl Inner {
     }
 
     // Moo!
-    fn raw_cow(&self) -> CowVec<Vec<u8>> {
+    fn raw_cow(&self) -> Cow<[Vec<u8>]> {
         if self.raw_valid {
             match self.raw {
-                Some(ref vec) => vec[].into_cow(),
+                Some(ref vec) => vec[..].into_cow(),
                 None => unreachable!(),
             }
         } else {
@@ -169,7 +168,7 @@ impl Inner {
 
     // Pass `false` to convert_if_necessary if `typed_mut` was called with the same `H`
     // immediately before; otherwise pass `true`.
-    fn typed_cow<H: ToHeader + Header + Clone + 'static>(&self, convert_if_necessary: bool) -> Option<Cow<H, H>> {
+    fn typed_cow<H: ToHeader + Header + Clone + 'static>(&self, convert_if_necessary: bool) -> Option<Cow<H>> {
         match self.typed {
             Some(ref h) if h.is::<H>() => {
                 Some(unsafe { Cow::Borrowed(h.downcast_ref_unchecked::<H>()) })
@@ -187,7 +186,7 @@ mucell_ref_type! {
     //#[doc = "TODO"]
     struct RawRef<'a>(Inner),
     impl Deref -> [Vec<u8>],
-    data: CowVec<'a, Vec<u8>> = |x| x.raw_cow()
+    data: Cow<'a, [Vec<u8>]> = |x| x.raw_cow()
 }
 
 impl<'a> RawRef<'a> {
@@ -203,14 +202,14 @@ impl<'a> RawRef<'a> {
 //    //#[doc = "TODO"]
 //    struct TypedRef<'a, T: 'static>(Inner),
 //    impl Deref -> T,
-//    data: Cow<'a, T, &'a T> = |x| x.typed_cow()
+//    data: Cow<'a, T> = |x| x.typed_cow()
 //}
 
 /// An immutable reference to a `MuCell`. Dereference to get at the object.
 //$(#[$attr])*
 pub struct TypedRef<'a, H: ToHeader + Header + Clone + 'static> {
     _parent: Ref<'a, Inner>,
-    _data: Cow<'a, H, H>,
+    _data: Cow<'a, H>,
 }
 
 impl<'a, H: ToHeader + Header + Clone + 'static> TypedRef<'a, H> {
@@ -362,7 +361,7 @@ mod tests {
     use super::{Item, Inner};
     use super::super::{ToHeader, Header};
     use std::fmt;
-    use std::old_io::IoResult;
+    use std::io;
     use mucell::MuCell;
 
     fn mkitem<H: Header + 'static>(raw_valid: bool,
@@ -389,7 +388,7 @@ mod tests {
     }
 
     impl Header for StrongType {
-        fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
+        fn fmt_header(&self, w: &mut io::Write) -> io::Result<()> {
             let StrongType(ref vec) = *self;
             let mut first = true;
             for field in vec.iter() {
@@ -415,7 +414,7 @@ mod tests {
     }
 
     impl Header for NonParsingStrongType {
-        fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
+        fn fmt_header(&self, w: &mut io::Write) -> io::Result<()> {
             let NonParsingStrongType(ref st) = *self;
             st.fmt_header(w)
         }

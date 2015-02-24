@@ -2,8 +2,8 @@
 
 use std::any::Any;
 use std::fmt;
-use std::old_io::IoResult;
-use std::string::CowString;
+use std::io;
+use std::borrow::Cow;
 
 use std::collections::hash_map::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
@@ -32,7 +32,7 @@ pub trait Header: Any + HeaderClone {
     /// accessing a cached Box<Header> object as a different type; then, it is shoved into a buffer
     /// through fmt_header and then back into the new type through parse_header. Should the
     /// fmt_header call have return an Err, it will fail.
-    fn fmt_header(&self, writer: &mut Writer) -> IoResult<()>;
+    fn fmt_header(&self, writer: &mut io::Write) -> io::Result<()>;
 }
 
 mopafy!(Header);
@@ -57,7 +57,6 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 ///
 /// ```rust,ignore
 /// use std::borrow::IntoCow;
-/// use std::string::CowString;
 /// use httpcommon::headers::{Header, HeaderMarker};
 ///
 /// // The header data type
@@ -75,7 +74,7 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 ///
 /// impl HeaderMarker for FOO {
 ///     type Output = Foo;
-///     fn header_name(&self) -> CowString<'static> {
+///     fn header_name(&self) -> Cow<'static, str> {
 ///         "foo".into_cow()
 ///     }
 /// }
@@ -91,12 +90,12 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 /// #     fn parse_header(_raw: &[Vec<u8>]) -> Option<Foo> { Some(Foo) }
 /// # }
 /// # impl httpcommon::headers::Header for Foo {
-/// #     fn fmt_header(&self, w: &mut Writer) -> std::old_io::IoResult<()> { Ok(()) }
+/// #     fn fmt_header(&self, w: &mut std::io::Write) -> std::io::Result<()> { Ok(()) }
 /// # }
 /// # struct FOO;
 /// # impl httpcommon::headers::HeaderMarker for FOO {
 /// #     type Output = Foo;
-/// #     fn header_name(&self) -> std::string::CowString<'static> { "foo".into_cow() }
+/// #     fn header_name(&self) -> std::borrow::Cow<'static, str> { "foo".into_cow() }
 /// # }
 /// # struct Request { headers: httpcommon::headers::Headers }
 /// # fn main() {
@@ -117,7 +116,7 @@ pub trait HeaderMarker {
     ///
     /// Normally this will be a static string, but occasionally it may be necessary to define it at
     /// runtime, for dynamic header handling.
-    fn header_name(&self) -> CowString<'static>;
+    fn header_name(&self) -> Cow<'static, str>;
 }
 
 impl Clone for Box<Header + 'static> {
@@ -127,13 +126,13 @@ impl Clone for Box<Header + 'static> {
 }
 
 impl Header for Box<Header + 'static> {
-    fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
+    fn fmt_header(&self, w: &mut io::Write) -> io::Result<()> {
         (**self).fmt_header(w)
     }
 }
 
 impl<'a> Header for &'static (Header + 'static) {
-    fn fmt_header(&self, w: &mut Writer) -> IoResult<()> {
+    fn fmt_header(&self, w: &mut io::Write) -> io::Result<()> {
         (**self).fmt_header(w)
     }
 }
@@ -249,7 +248,7 @@ impl<'a> Header for &'static (Header + 'static) {
 /// item.
 #[derive(PartialEq)]
 pub struct Headers {
-    data: HashMap<CowString<'static>, Item>,
+    data: HashMap<Cow<'static, str>, Item>,
 }
 
 impl Headers {

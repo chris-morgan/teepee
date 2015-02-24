@@ -25,5 +25,5 @@ path = "src/httpcommon/lib.rs"
 [dependencies]
 mucell = "*"
 phf = "*"
-phf_mac = "*"
+phf_macros = "*"
 mopa = "*"

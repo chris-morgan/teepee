@@ -22,7 +22,7 @@
 //!           | "}" | SP | HT
 //! ```
 
-use std::borrow::BorrowFrom;
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::fmt;
 use std::ops::Deref;
@@ -198,10 +198,14 @@ impl<'a> Deref for Token<'a> {
     }
 }
 
-impl<'a> BorrowFrom<Token<'a>> for [u8] {
-    fn borrow_from<'b>(owned: &'b Token<'a>) -> &'b [u8] { owned.as_bytes() }
+impl<'a> Borrow<[u8]> for Token<'a> {
+    fn borrow(&self) -> &[u8] {
+        self.as_bytes()
+    }
 }
 
-impl<'a> BorrowFrom<Token<'a>> for str {
-    fn borrow_from<'b>(owned: &'b Token<'a>) -> &'b str { owned.as_str() }
+impl<'a> Borrow<str> for Token<'a> {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
 }
