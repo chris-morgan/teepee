@@ -1,6 +1,6 @@
 //! The internals of header representation. That is: `Item`.
 
-use std::borrow::{Cow, IntoCow};
+use std::borrow::Cow;
 use std::ops::Deref;
 
 use mucell::{MuCell, Ref};
@@ -42,7 +42,7 @@ struct Inner {
     raw: Option<Vec<Vec<u8>>>,
 
     /// A strongly typed header which has been parsed from the raw value.
-    typed: Option<Box<Header + 'static>>,
+    typed: Option<Box<Header>>,
 }
 
 #[derive(PartialEq)]
@@ -105,18 +105,18 @@ impl Inner {
     fn raw_cow(&self) -> Cow<[Vec<u8>]> {
         if self.raw_valid {
             match self.raw {
-                Some(ref vec) => vec[..].into_cow(),
+                Some(ref vec) => Cow::Borrowed(&vec[..]),
                 None => unreachable!(),
             }
         } else {
             match self.typed {
-                Some(ref typed) => vec![fmt_header(typed)].into_cow(),
+                Some(ref typed) => Cow::Owned(vec![fmt_header(typed)]),
                 None => unreachable!(),
             }
         }
     }
 
-    fn typed_mut<H: ToHeader + Header + 'static>(&mut self, invalidate_raw: bool) -> Option<&mut H> {
+    fn typed_mut<H: ToHeader + Header>(&mut self, invalidate_raw: bool) -> Option<&mut H> {
         match self.typed {
             None => {
                 debug_assert_eq!(self.raw_valid, true);
@@ -124,10 +124,10 @@ impl Inner {
                 if invalidate_raw {
                     self.raw_valid = false;
                 }
-                let h: Option<H> = ToHeader::parse_header(self.raw.as_ref().unwrap().as_slice());
+                let h: Option<H> = ToHeader::parse_header(self.raw.as_ref().unwrap());
                 match h {
                     Some(h) => {
-                        self.typed = Some(Box::new(h) as Box<Header + 'static>);
+                        self.typed = Some(Box::new(h));
                         Some(unsafe { self.typed.as_mut().unwrap().downcast_mut_unchecked::<H>() })
                     },
                     None => None,
@@ -154,10 +154,10 @@ impl Inner {
                 } else if invalidate_raw {
                     self.raw_valid = false;
                 }
-                let otyped: Option<H> = ToHeader::parse_header(self.raw.as_ref().unwrap().as_slice());
+                let otyped: Option<H> = ToHeader::parse_header(self.raw.as_ref().unwrap());
                 match otyped {
                     Some(typed) => {
-                        *h = Box::new(typed) as Box<Header + 'static>;
+                        *h = Box::new(typed);
                         Some(unsafe { h.downcast_mut_unchecked::<H>() })
                     },
                     None => None,
@@ -168,7 +168,7 @@ impl Inner {
 
     // Pass `false` to convert_if_necessary if `typed_mut` was called with the same `H`
     // immediately before; otherwise pass `true`.
-    fn typed_cow<H: ToHeader + Header + Clone + 'static>(&self, convert_if_necessary: bool) -> Option<Cow<H>> {
+    fn typed_cow<H: ToHeader + Header + Clone>(&self, convert_if_necessary: bool) -> Option<Cow<H>> {
         match self.typed {
             Some(ref h) if h.is::<H>() => {
                 Some(unsafe { Cow::Borrowed(h.downcast_ref_unchecked::<H>()) })
@@ -207,13 +207,14 @@ impl<'a> RawRef<'a> {
 
 /// An immutable reference to a `MuCell`. Dereference to get at the object.
 //$(#[$attr])*
-pub struct TypedRef<'a, H: ToHeader + Header + Clone + 'static> {
+pub struct TypedRef<'a, H: ToHeader + Header + Clone> {
     _parent: Ref<'a, Inner>,
     _data: Cow<'a, H>,
 }
 
-impl<'a, H: ToHeader + Header + Clone + 'static> TypedRef<'a, H> {
+impl<'a, H: ToHeader + Header + Clone> TypedRef<'a, H> {
     /// Construct a reference from the cell.
+    #[allow(trivial_casts)]  // The `as *const $ty` cast
     fn from(cell: &'a MuCell<Inner>, convert_if_necessary: bool) -> Option<TypedRef<'a, H>> {
         let parent = cell.borrow();
         let inner: &'a Inner = unsafe { &*(&*parent as *const Inner) };
@@ -228,14 +229,14 @@ impl<'a, H: ToHeader + Header + Clone + 'static> TypedRef<'a, H> {
 }
 
 #[unstable = "trait is not stable"]
-impl<'a, H: ToHeader + Header + Clone + 'static> Deref for TypedRef<'a, H> {
+impl<'a, H: ToHeader + Header + Clone> Deref for TypedRef<'a, H> {
     type Target = H;
     fn deref<'b>(&'b self) -> &'b H {
         &*self._data
     }
 }
 
-impl<'a, H: ToHeader + Header + Clone + 'static> TypedRef<'a, H> {
+impl<'a, H: ToHeader + Header + Clone> TypedRef<'a, H> {
     /// Extract the owned data.
     ///
     /// Copies the data if it is not already owned.
@@ -262,12 +263,12 @@ impl Item {
     }
 
     /// Construct a new Item from a typed representation.
-    pub fn from_typed<H: Header + 'static>(typed: H) -> Item {
+    pub fn from_typed<H: Header>(typed: H) -> Item {
         Item {
             inner: MuCell::new(Inner {
                 raw_valid: false,
                 raw: None,
-                typed: Some(Box::new(typed) as Box<Header + 'static>),
+                typed: Some(Box::new(typed)),
             }),
         }
     }
@@ -315,7 +316,7 @@ impl Item {
     /// fashion, it will be produced from the typed form.
     ///
     /// Only use this if you need to mutate the typed form; if you don't, use `typed`.
-    pub fn typed_mut<H: ToHeader + Header + 'static>(&mut self) -> Option<&mut H> {
+    pub fn typed_mut<H: ToHeader + Header>(&mut self) -> Option<&mut H> {
         self.inner.borrow_mut().typed_mut(true)
     }
 
@@ -329,7 +330,7 @@ impl Item {
     /// can dereference to get your typed reference.
     ///
     /// See also `typed_mut`, if you wish to mutate the typed representation.
-    pub fn typed<H: ToHeader + Header + Clone + 'static>(&self) -> Option<TypedRef<H>> {
+    pub fn typed<H: ToHeader + Header + Clone>(&self) -> Option<TypedRef<H>> {
         let convert_if_necessary = self.inner.try_mutate(|inner| {
             let _ = inner.typed_mut::<H>(false);
         });
@@ -339,10 +340,10 @@ impl Item {
     /// Set the typed form of the header.
     ///
     /// This invalidates the raw representation.
-    pub fn set_typed<H: Header + 'static>(&mut self, value: H) {
+    pub fn set_typed<H: Header>(&mut self, value: H) {
         let inner = self.inner.borrow_mut();
         inner.raw_valid = false;
-        inner.typed = Some(Box::new(value) as Box<Header + 'static>);
+        inner.typed = Some(Box::new(value));
     }
 }
 
@@ -364,13 +365,13 @@ mod tests {
     use std::io;
     use mucell::MuCell;
 
-    fn mkitem<H: Header + 'static>(raw_valid: bool,
-                                   raw: Option<Vec<Vec<u8>>>,
-                                   typed: Option<H>) -> Item {
+    fn mkitem<H: Header>(raw_valid: bool,
+                         raw: Option<Vec<Vec<u8>>>,
+                         typed: Option<H>) -> Item {
         let item = Inner {
             raw_valid: raw_valid,
             raw: raw,
-            typed: typed.map(|h| Box::new(h) as Box<Header + 'static>),
+            typed: typed.map(|h| { let h: Box<Header> = Box::new(h); h }),
         };
         item.assert_invariants();
         Item { inner: MuCell::new(item) }
@@ -395,7 +396,7 @@ mod tests {
                 if !first {
                     try!(w.write_all(b", "));
                 }
-                try!(w.write_all(field.as_slice()));
+                try!(w.write_all(field));
                 first = false;
             }
             Ok(())
@@ -420,7 +421,7 @@ mod tests {
         }
     }
 
-    fn assert_headers_eq<H: Header + Clone + PartialEq + fmt::Debug + 'static>(item: &Item, other: &Item) {
+    fn assert_headers_eq<H: Header + Clone + PartialEq + fmt::Debug>(item: &Item, other: &Item) {
         let item = item.inner.borrow();
         let other = other.inner.borrow();
         item.assert_invariants();
@@ -468,7 +469,7 @@ mod tests {
     //fn d4np() -> NonParsingStrongType { NonParsingStrongType(d4st()) }
 
     #[test]
-    #[should_fail]
+    #[should_panic]
     fn test_from_raw_with_empty_vector() {
         // Would not satisfy invariants, explicitly fails.
         let _raw = Item::from_raw(vec![]);

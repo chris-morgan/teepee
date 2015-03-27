@@ -42,11 +42,11 @@ mopafy!(Header);
 pub trait HeaderClone {
     /// Clone self as a boxed header.
     #[inline]
-    fn clone_boxed(&self) -> Box<Header + 'static>;
+    fn clone_boxed(&self) -> Box<Header>;
 }
 
-impl<T: Header + Clone + 'static> HeaderClone for T {
-    fn clone_boxed(&self) -> Box<Header + 'static> {
+impl<T: Header + Clone> HeaderClone for T {
+    fn clone_boxed(&self) -> Box<Header> {
         Box::new(self.clone())
     }
 }
@@ -56,7 +56,7 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 /// Standard usage of this is very simple unit-struct marker types, like this:
 ///
 /// ```rust,ignore
-/// use std::borrow::IntoCow;
+/// use std::borrow::Cow;
 /// use httpcommon::headers::{Header, HeaderMarker};
 ///
 /// // The header data type
@@ -75,7 +75,7 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 /// impl HeaderMarker for FOO {
 ///     type Output = Foo;
 ///     fn header_name(&self) -> Cow<'static, str> {
-///         "foo".into_cow()
+///         Cow::Borrowed("foo")
 ///     }
 /// }
 /// ```
@@ -84,7 +84,7 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 ///
 /// ```rust
 /// # extern crate httpcommon;
-/// # use std::borrow::IntoCow;
+/// # use std::borrow::Cow;
 /// # #[derive(Clone)] struct Foo;
 /// # impl httpcommon::headers::ToHeader for Foo {
 /// #     fn parse_header(_raw: &[Vec<u8>]) -> Option<Foo> { Some(Foo) }
@@ -95,7 +95,7 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 /// # struct FOO;
 /// # impl httpcommon::headers::HeaderMarker for FOO {
 /// #     type Output = Foo;
-/// #     fn header_name(&self) -> std::borrow::Cow<'static, str> { "foo".into_cow() }
+/// #     fn header_name(&self) -> std::borrow::Cow<'static, str> { Cow::Borrowed("foo") }
 /// # }
 /// # struct Request { headers: httpcommon::headers::Headers }
 /// # fn main() {
@@ -110,7 +110,8 @@ impl<T: Header + Clone + 'static> HeaderClone for T {
 /// And lo! `foo` is a `Foo` object corresponding to the `foo` (or `Foo`, or `fOO`, &c.) header in
 /// the request.
 pub trait HeaderMarker {
-    type Output: ToHeader + Header + Clone + 'static;
+    /// The data type of the header.
+    type Output: ToHeader + Header + Clone;
 
     /// The name of the header that shall be used for retreiving and setting.
     ///
@@ -119,19 +120,19 @@ pub trait HeaderMarker {
     fn header_name(&self) -> Cow<'static, str>;
 }
 
-impl Clone for Box<Header + 'static> {
-    fn clone(&self) -> Box<Header + 'static> {
+impl Clone for Box<Header> {
+    fn clone(&self) -> Box<Header> {
         self.clone_boxed()
     }
 }
 
-impl Header for Box<Header + 'static> {
+impl Header for Box<Header> {
     fn fmt_header(&self, w: &mut io::Write) -> io::Result<()> {
         (**self).fmt_header(w)
     }
 }
 
-impl<'a> Header for &'static (Header + 'static) {
+impl Header for &'static Header {
     fn fmt_header(&self, w: &mut io::Write) -> io::Result<()> {
         (**self).fmt_header(w)
     }

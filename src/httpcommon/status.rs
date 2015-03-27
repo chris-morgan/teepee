@@ -1642,9 +1642,9 @@ impl Copy for StatusCode {}
 ///
 /// ```rust
 /// # use httpcommon::status::{ImATeapot, Code123};
-/// assert_eq!(format!("{}", ImATeapot).as_slice(),
+/// assert_eq!(format!("{}", ImATeapot),
 ///            "418 I'm a teapot");
-/// assert_eq!(format!("{}", Code123).as_slice(),
+/// assert_eq!(format!("{}", Code123),
 ///            "123 <unknown status code>");
 /// ```
 ///
@@ -1652,8 +1652,8 @@ impl Copy for StatusCode {}
 ///
 /// ```rust
 /// # use httpcommon::status::{ImATeapot, Code123};
-/// assert_eq!(format!("{}", ImATeapot as u16).as_slice(), "418");
-/// assert_eq!(format!("{}", Code123 as u16).as_slice(), "123");
+/// assert_eq!(format!("{}", ImATeapot as u16), "418");
+/// assert_eq!(format!("{}", Code123 as u16), "123");
 /// ```
 impl fmt::Display for StatusCode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
