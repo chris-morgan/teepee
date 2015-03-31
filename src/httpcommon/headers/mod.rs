@@ -175,7 +175,7 @@ pub trait Marker<'a>: marker::PhantomFn<&'a ()> {
     type GetMut: internals::GetMut<'a>;
 
     /// The argument to Headers.set(marker, ___).
-    type Set: Header + ToHeader + Clone + 'static;
+    type Set: Header + ToHeader + Clone;
 
     /// The name of the header that shall be used for retreiving and setting.
     ///
@@ -392,7 +392,8 @@ impl Headers {
     }
 
     /// Set the named header to the given value.
-    pub fn set<M: Marker<'static>>(&mut self, marker: M, value: M::Set) {
+    // TODO: sans `where M::Set: Any` I get an ICE. I haven’t reported it yet, but I bet someone else has.
+    pub fn set<M: Marker<'static>>(&mut self, marker: M, value: M::Set) where M::Set: Any {
         // Houston, we have a minor problem here. Unlike Get and GetMut which were unambiguous,
         // here we have for single headers an impl for T and for list headers one for Vec<T>.
         // We’d like to do `internals::Set::set(self.data.entry(marker.header_name()), value)`,
@@ -407,18 +408,18 @@ impl Headers {
             // TODO: determine whether this is *efficient* when optimised, i.e. noop.
             let value_vec: Vec<M::Base> = unsafe { mem::transmute_copy(&value) };
             unsafe { mem::forget(value) }
-            match entry.get() {
-                Ok(item) => item.set_list_typed(value_vec),
-                Err(vacant) => {
-                    let _ = vacant.insert(Item::from_list_typed(value_vec));
+            match entry {
+                Occupied(entry) => entry.into_mut().set_list_typed(value_vec),
+                Vacant(entry) => {
+                    let _ = entry.insert(Item::from_list_typed(value_vec));
                 },
             }
         } else {
             // It’s a single header.
-            match entry.get() {
-                Ok(item) => item.set_single_typed(value),
-                Err(vacant) => {
-                    let _ = vacant.insert(Item::from_single_typed(value));
+            match entry {
+                Occupied(entry) => entry.into_mut().set_single_typed(value),
+                Vacant(entry) => {
+                    let _ = entry.insert(Item::from_single_typed(value));
                 },
             }
         }

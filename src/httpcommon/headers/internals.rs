@@ -3,7 +3,6 @@
 use std::borrow::Cow;
 use std::collections::hash_map;
 use std::ops::Deref;
-use std::any::Any;
 use std::fmt;
 use std::mem;
 use std::slice;
@@ -818,19 +817,16 @@ pub trait GetMut<'a> {
 
 impl<'a, T: ToHeader + Header + Clone> GetMut<'a> for Option<&'a mut T> {
     fn get_mut(entry: hash_map::Entry<'a, Cow<'static, str>, Item>) -> Self {
-        match entry.get() {
-            Ok(item) => item.single_typed_mut(),
-            Err(_vacant) => None,
+        match entry {
+            hash_map::Entry::Occupied(entry) => entry.into_mut().single_typed_mut(),
+            hash_map::Entry::Vacant(_) => None,
         }
     }
 }
 
 impl<'a, T: ToHeader + Header + Clone> GetMut<'a> for &'a mut Vec<T> {
     fn get_mut(entry: hash_map::Entry<'a, Cow<'static, str>, Item>) -> Self {
-        match entry.get() {
-            Ok(item) => item,
-            Err(vacant) => vacant.insert(Item::from_list_typed::<T>(vec![]))
-        }.list_typed_mut()
+        entry.or_insert_with(|| Item::from_list_typed::<T>(vec![])).list_typed_mut()
     }
 }
 
