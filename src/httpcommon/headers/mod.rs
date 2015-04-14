@@ -3,7 +3,6 @@
 use std::any::{Any, TypeId};
 use std::fmt;
 use std::borrow::Cow;
-use std::marker;
 use std::mem;
 
 use std::collections::hash_map::HashMap;
@@ -163,8 +162,7 @@ impl<T: ToHeader + Header + Clone + 'static> ToHeader for Vec<T> {
 ///
 /// And lo! `foo` is a `Foo` object corresponding to the `foo` (or `Foo`, or `fOO`, &c.) header in
 /// the request.
-// PhantomFn is for 'a’s sake. Ugly, very.
-pub trait Marker<'a>: marker::PhantomFn<&'a ()> {
+pub trait Marker<'a> {
     /// The fundamental header type under consideration (for list headers, H rather than Vec<H>).
     type Base: Header + ToHeader + Clone;
 
