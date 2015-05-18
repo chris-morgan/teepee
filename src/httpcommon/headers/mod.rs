@@ -1,6 +1,7 @@
 //! HTTP headers.
 
-use std::any::{Any, TypeId};
+use std::any::TypeId;
+use mopa::Any;
 use std::fmt;
 use std::borrow::Cow;
 use std::mem;
@@ -52,7 +53,7 @@ pub trait Header: Any + HeaderClone {
     /// method of this trait. This method only exists as it is because I consider it conceivable at
     /// present that there may be cases where there is a better choice. It might be shifted out of
     /// the trait later.
-    #[unstable = "might be removed from the trait"]
+    // unstable: might be removed from the trait
     fn to_raw(&self) -> Vec<u8> {
         format!("{}", HeaderDisplayAdapter(&*self)).into_bytes()
     }
@@ -66,7 +67,7 @@ pub trait Header: Any + HeaderClone {
     /// method of this trait. This method only exists as it is because I consider it conceivable at
     /// present that there may be cases where there is a better choice. It might be shifted out of
     /// the trait later.
-    #[unstable = "might be removed from the trait"]
+    // unstable: might be removed from the trait
     fn into_raw(self: Box<Self>) -> Vec<u8> {
         self.to_raw()
     }
@@ -405,7 +406,7 @@ impl Headers {
             // value into a new type and forgetting the old value.
             // TODO: determine whether this is *efficient* when optimised, i.e. noop.
             let value_vec: Vec<M::Base> = unsafe { mem::transmute_copy(&value) };
-            unsafe { mem::forget(value) }
+            mem::forget(value);
             match entry {
                 Occupied(entry) => entry.into_mut().set_list_typed(value_vec),
                 Vacant(entry) => {
