@@ -10,18 +10,6 @@ readme = "README.md"
 keywords = ["web", "http", "library"]
 license = "MIT/Apache-2.0"
 
-[lib]
-name = "httpcommon"
-path = "src/httpcommon/lib.rs"
-
-#[[lib]]
-#name = "httpc"
-#path = "src/httpc/lib.rs"
-#
-#[[lib]]
-#name = "httpd"
-#path = "src/httpd/lib.rs"
-
 [dependencies]
 mucell = "*"
 phf = "*"

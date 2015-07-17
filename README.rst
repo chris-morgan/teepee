@@ -5,6 +5,18 @@ Teepee: the Rust HTTP toolkit
 .. image:: https://travis-ci.org/teepee/teepee.png?branch=master
    :target: https://travis-ci.org/teepee/teepee
 
+Status: stalled and designing
+=============================
+
+Things happened, things didn’t happen, Hyper got started by others instead.
+Something is still slowly happening with this, but don’t try doing anything
+with it.
+
+**The remainder of this document is out of date.**
+Use Hyper instead for now, too.
+
+----
+
 Status: in design
 =================
 

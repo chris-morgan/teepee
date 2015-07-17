@@ -119,8 +119,8 @@ impl<T: ToHeader + Header + Clone + 'static> ToHeader for Vec<T> {
 /// Standard usage of this is very simple unit-struct marker types, like this:
 ///
 /// ```rust,ignore
-/// #[macro_use] extern crate httpcommon;
-/// use httpcommon::headers::{ToHeader, Header};
+/// #[macro_use] extern crate teepee;
+/// use teepee::headers::{ToHeader, Header};
 ///
 /// // The header data type
 /// #[derive(Clone)]
@@ -143,18 +143,18 @@ impl<T: ToHeader + Header + Clone + 'static> ToHeader for Vec<T> {
 /// Then, accessing the header is done like this:
 ///
 /// ```rust
-/// # #[macro_use] extern crate httpcommon;
+/// # #[macro_use] extern crate teepee;
 /// # #[derive(Clone)] struct Foo;
-/// # impl httpcommon::headers::ToHeader for Foo {
+/// # impl teepee::headers::ToHeader for Foo {
 /// #     fn parse(_raw: &[u8]) -> Option<Foo> { Some(Foo) }
 /// # }
-/// # impl httpcommon::headers::Header for Foo {
+/// # impl teepee::headers::Header for Foo {
 /// #     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { Ok(()) }
 /// # }
 /// # define_single_header_marker!(FOO: Foo = "foo");
-/// # struct Request { headers: httpcommon::headers::Headers }
+/// # struct Request { headers: teepee::headers::Headers }
 /// # fn main() {
-/// # let mut request = Request { headers: httpcommon::headers::Headers::new() };
+/// # let mut request = Request { headers: teepee::headers::Headers::new() };
 /// # request.headers.set(FOO, Foo);
 /// // Of course, this is assuming that we *know* the header is there.
 /// let foo = request.headers.get(FOO).unwrap().clone();
@@ -186,15 +186,15 @@ pub trait Marker<'a> {
 /// Examples:
 ///
 /// ```rust
-/// # #[macro_use] extern crate httpcommon;
+/// # #[macro_use] extern crate teepee;
 /// # fn main() { }
 /// # #[derive(Clone)] struct Foo;
-/// # impl httpcommon::headers::Header for Foo {
+/// # impl teepee::headers::Header for Foo {
 /// #     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 /// #         unimplemented!();
 /// #     }
 /// # }
-/// # impl httpcommon::headers::ToHeader for Foo {
+/// # impl teepee::headers::ToHeader for Foo {
 /// #     fn parse(_: &[u8]) -> Option<Self> {
 /// #         unimplemented!();
 /// #     }
@@ -241,15 +241,15 @@ macro_rules! define_single_header_marker {
 /// Examples:
 ///
 /// ```rust
-/// # #[macro_use] extern crate httpcommon;
+/// # #[macro_use] extern crate teepee;
 /// # fn main() { }
 /// # #[derive(Clone)] struct Method;
-/// # impl httpcommon::headers::Header for Method {
+/// # impl teepee::headers::Header for Method {
 /// #     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 /// #         unimplemented!();
 /// #     }
 /// # }
-/// # impl httpcommon::headers::ToHeader for Method {
+/// # impl teepee::headers::ToHeader for Method {
 /// #     fn parse(_: &[u8]) -> Option<Self> {
 /// #         unimplemented!();
 /// #     }

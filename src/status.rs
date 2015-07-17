@@ -20,7 +20,7 @@ pub use self::StatusClass::*;
 /// `self.class().default_code()`:
 ///
 /// ```rust
-/// # use httpcommon::status::{Code123, Continue};
+/// # use teepee::status::{Code123, Continue};
 /// assert_eq!(Code123.class().default_code(), Continue);
 /// ```
 ///
@@ -1640,7 +1640,7 @@ impl Copy for StatusCode {}
 /// Formats the status code, *including* the canonical reason.
 ///
 /// ```rust
-/// # use httpcommon::status::{ImATeapot, Code123};
+/// # use teepee::status::{ImATeapot, Code123};
 /// assert_eq!(format!("{}", ImATeapot),
 ///            "418 I'm a teapot");
 /// assert_eq!(format!("{}", Code123),
@@ -1650,7 +1650,7 @@ impl Copy for StatusCode {}
 /// If you wish to just include the number, cast to a `u16` instead:
 ///
 /// ```rust
-/// # use httpcommon::status::{ImATeapot, Code123};
+/// # use teepee::status::{ImATeapot, Code123};
 /// assert_eq!(format!("{}", ImATeapot as u16), "418");
 /// assert_eq!(format!("{}", Code123 as u16), "123");
 /// ```
@@ -2276,7 +2276,7 @@ impl StatusClass {
     /// produce `BadRequest` (400):
     ///
     /// ```rust
-    /// # use httpcommon::status::{ClientError, BadRequest};
+    /// # use teepee::status::{ClientError, BadRequest};
     /// assert_eq!(ClientError.default_code(), BadRequest);
     /// ```
     ///
@@ -2300,7 +2300,7 @@ impl StatusClass {
     /// This is demonstrated thusly:
     ///
     /// ```rust
-    /// # use httpcommon::status::{Code471, BadRequest};
+    /// # use teepee::status::{Code471, BadRequest};
     /// // Suppose we have received this status code.
     /// let status = Code471;
     ///

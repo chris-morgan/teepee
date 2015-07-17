@@ -69,8 +69,8 @@ macro_rules! method_enum {
             /// Where possible, this will use the fancy variants like `Get`:
             ///
             /// ```rust
-            /// # use httpcommon::grammar::token::Token;
-            /// # use httpcommon::method::{Method, Get};
+            /// # use teepee::grammar::token::Token;
+            /// # use teepee::method::{Method, Get};
             /// let token = Token::from_slice(b"GET").unwrap();
             /// assert_eq!(Method::from_token(token), Get);
             /// ```
@@ -79,8 +79,8 @@ macro_rules! method_enum {
             /// `UnregisteredMethod` with `safe` and `idempotent` both set to `false`:
             ///
             /// ```rust
-            /// # use httpcommon::grammar::token::Token;
-            /// # use httpcommon::method::{Method, UnregisteredMethod};
+            /// # use teepee::grammar::token::Token;
+            /// # use teepee::method::{Method, UnregisteredMethod};
             /// let token = Token::from_slice(b"PANIC").unwrap();
             /// let panic = UnregisteredMethod {
             ///     name: token.clone(),
@@ -113,8 +113,8 @@ macro_rules! method_enum {
             /// Produce a registered `method` from a token.
             ///
             /// ```rust
-            /// # use httpcommon::grammar::token::Token;
-            /// # use httpcommon::method::{Method, Get};
+            /// # use teepee::grammar::token::Token;
+            /// # use teepee::method::{Method, Get};
             /// let token = Token::from_slice(b"GET").unwrap();
             /// assert_eq!(Method::registered_from_token(token), Some(Get));
             /// ```
@@ -122,8 +122,8 @@ macro_rules! method_enum {
             /// If the token does not refer to a registered method, this will produce `None`.
             ///
             /// ```rust
-            /// # use httpcommon::grammar::token::Token;
-            /// # use httpcommon::method::Method;
+            /// # use teepee::grammar::token::Token;
+            /// # use teepee::method::Method;
             /// let token = Token::from_slice(b"PANIC").unwrap();
             /// assert_eq!(Method::registered_from_token(token), None);
             /// ```
