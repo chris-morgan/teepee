@@ -1,8 +1,7 @@
 //! HTTP status codes.
 
 use std::fmt;
-use std::mem::transmute;
-use std::num::{FromPrimitive, ToPrimitive};
+use std::mem;
 use std::cmp::Ordering;
 
 pub use self::StatusCode::*;
@@ -2196,20 +2195,13 @@ impl Clone for StatusCode {
 
 // Of the other common derivable traits, I didn’t measure them, but I guess they would be slow too.
 
-impl FromPrimitive for StatusCode {
-    fn from_i64(n: i64) -> Option<StatusCode> {
-        if n < 100 || n > 599 {
-            None
+impl StatusCode {
+    /// Convert a `u16` to a `StatusCode` if it is in the legal range (100–599).
+    pub fn from_u16(n: u16) -> Result<StatusCode, ()> {
+        if n >= 100 && n <= 599 {
+            Result::Ok(unsafe { mem::transmute(n) })
         } else {
-            Some(unsafe { transmute::<u16, StatusCode>(n as u16) })
-        }
-    }
-
-    fn from_u64(n: u64) -> Option<StatusCode> {
-        if n < 100 || n > 599 {
-            None
-        } else {
-            Some(unsafe { transmute::<u16, StatusCode>(n as u16) })
+            Err(())
         }
     }
 }
@@ -2231,16 +2223,6 @@ impl Ord for StatusCode {
         } else {
             Ordering::Equal
         }
-    }
-}
-
-impl ToPrimitive for StatusCode {
-    fn to_i64(&self) -> Option<i64> {
-        Some(*self as i64)
-    }
-
-    fn to_u64(&self) -> Option<u64> {
-        Some(*self as u64)
     }
 }
 
@@ -2332,16 +2314,6 @@ impl StatusClass {
     /// ```
     #[inline]
     pub fn default_code(&self) -> StatusCode {
-        unsafe { transmute::<StatusClass, StatusCode>(*self) }
-    }
-}
-
-impl ToPrimitive for StatusClass {
-    fn to_i64(&self) -> Option<i64> {
-        Some(*self as i64)
-    }
-
-    fn to_u64(&self) -> Option<u64> {
-        Some(*self as u64)
+        unsafe { mem::transmute(*self) }
     }
 }
