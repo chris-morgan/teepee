@@ -13,6 +13,7 @@ use self::internals::Item;
 pub use self::internals::{TypedRef, TypedListRef, RawRef};
 
 mod internals;
+mod implementations;
 
 /// A trait defining the parsing of a header from a raw value.
 pub trait ToHeader {
@@ -104,12 +105,12 @@ impl<T: ToHeader + Header + Clone + 'static> Header for Vec<T> {
     }
 }
 
-// Would that this one was not necessary. But alas, it is until we get negative impl bounds in the
-// language, so that Headers.set can work. (It’ll still be convenient to have the Header impl for
-// Vec<T>, but we can negate on the ToHeader-ness, subtle though the point be.)
+// This implementation is needed by Headers.set; when Rust gets specialisation or negative impl
+// bounds it will be able to go. (We’ll keep the Header implementation, however; it’s useful.)
 impl<T: ToHeader + Header + Clone + 'static> ToHeader for Vec<T> {
     fn parse(_raw_field_value: &[u8]) -> Option<Self> {
-        panic!("dummy impl, Vec<T> only implements ToHeader to work around type system deficiencies")
+        panic!("******* YOUR CODE IS BUGGY. *******\n<Vec<_> as ToHeader>.parse() was called; \
+                Vec<T> only implements ToHeader to work around type system deficiencies.")
     }
 }
 
@@ -155,8 +156,8 @@ impl<T: ToHeader + Header + Clone + 'static> ToHeader for Vec<T> {
 /// # fn main() {
 /// # let mut request = Request { headers: httpcommon::headers::Headers::new() };
 /// # request.headers.set(FOO, Foo);
-/// // Of course, this is assuming that we *know* the header is there
-/// let foo = request.headers.get(FOO).unwrap().into_owned();
+/// // Of course, this is assuming that we *know* the header is there.
+/// let foo = request.headers.get(FOO).unwrap().clone();
 /// request.headers.set(FOO, foo);
 /// # }
 /// ```
@@ -177,21 +178,46 @@ pub trait Marker<'a> {
     type Set: Header + ToHeader + Clone;
 
     /// The name of the header that shall be used for retreiving and setting.
-    ///
-    /// Normally this will be a static string, but occasionally it may be necessary to define it at
-    /// runtime, for dynamic header handling.
-    fn header_name(&self) -> Cow<'static, str>;
+    fn header_name() -> &'static str;
 }
 
 /// Define a single-type header marker.
 ///
 /// Examples:
 ///
-/// ```rust,ignore
+/// ```rust
+/// # #[macro_use] extern crate httpcommon;
+/// # fn main() { }
+/// # #[derive(Clone)] struct Foo;
+/// # impl httpcommon::headers::Header for Foo {
+/// #     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+/// #         unimplemented!();
+/// #     }
+/// # }
+/// # impl httpcommon::headers::ToHeader for Foo {
+/// #     fn parse(_: &[u8]) -> Option<Self> {
+/// #         unimplemented!();
+/// #     }
+/// # }
+/// # type Tm = Foo;
 /// define_single_header_marker!(FOO: Foo = "foo");
 /// define_single_header_marker!(DATE: Tm = "date");
-/// define_single_header_marker!(CONTENT_LENGTH: uint = "content-length");
+/// define_single_header_marker!(CONTENT_LENGTH: usize = "content-length");
 /// ```
+///
+/// These will handle headers like these:
+///
+/// ```http
+/// Foo: bar
+/// Date: Mon, 27 Jul 2009 12:28:53 GMT
+/// Content-Length: 17389
+/// ```
+///
+/// Given a header collection `headers`, the methods will be like this:
+///
+/// - `headers.get(CONTENT_LENGTH) -> Option<impl Deref<Target = usize>>`;
+/// - `headers.get_mut(CONTENT_LENGTH) -> Option<&mut usize>>`;
+/// - `headers.set(CONTENT_LENGTH, usize)`.
 #[macro_export]
 macro_rules! define_single_header_marker {
     ($marker:ident: $ty:ty = $name:expr) => {
@@ -203,21 +229,52 @@ macro_rules! define_single_header_marker {
             type GetMut = Option<&'a mut $ty>;
             type Set = $ty;
 
-            fn header_name(&self) -> ::std::borrow::Cow<'static, str> {
-                ::std::borrow::Cow::Borrowed($name)
+            fn header_name() -> &'static str {
+                $name
             }
         }
     }
 }
 
-/// Define a single-type header marker.
+/// Define a list-type header marker.
 ///
 /// Examples:
 ///
-/// ```rust,ignore
+/// ```rust
+/// # #[macro_use] extern crate httpcommon;
+/// # fn main() { }
+/// # #[derive(Clone)] struct Method;
+/// # impl httpcommon::headers::Header for Method {
+/// #     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+/// #         unimplemented!();
+/// #     }
+/// # }
+/// # impl httpcommon::headers::ToHeader for Method {
+/// #     fn parse(_: &[u8]) -> Option<Self> {
+/// #         unimplemented!();
+/// #     }
+/// # }
+/// # type Accept = Method;
 /// define_list_header_marker!(ALLOW: Method = "allow");
 /// define_list_header_marker!(ACCEPT: Accept = "accept");
 /// ```
+///
+/// These will handle headers like these:
+///
+/// ```http
+/// Allow: GET, POST, HEAD, OPTIONS, TRACE
+/// Accept: text/html;q=1.0, image/*;q=0.1
+/// Accept: application/json
+/// ```
+///
+/// With single-type headers, the absence of a header in getters is represented by `None`;
+/// with list-type headers, this is represented instead by an empty slice or vector.
+///
+/// Given a header collection `headers`, the methods will be like this:
+///
+/// - `headers.get(ALLOW) -> impl Deref<Target = &[Method]>` (an empty slice means no values);
+/// - `headers.get_mut(ALLOW) -> &mut Vec<Method>`;
+/// - `headers.set(ALLOW, Vec<Method>)`.
 #[macro_export]
 macro_rules! define_list_header_marker {
     ($marker:ident: $ty:ty = $name:expr) => {
@@ -229,8 +286,8 @@ macro_rules! define_list_header_marker {
             type GetMut = &'a mut Vec<$ty>;
             type Set = Vec<$ty>;
 
-            fn header_name(&self) -> ::std::borrow::Cow<'static, str> {
-                ::std::borrow::Cow::Borrowed($name)
+            fn header_name() -> &'static str {
+                $name
             }
         }
     }
@@ -265,21 +322,36 @@ impl Header for &'static Header {
 /// ```````````````````
 ///
 /// Unlike most HTTP libraries, this one cares about correctness and strong typing; headers are
-/// semantically typed values, not just sequences of characters. This may lead to some surprises for
-/// people used to other environments. For example, you might think that the `Connection` header is
-/// a scalar, having seen it with the value `close` most frequently when present; therefore you
-/// might expect to check `*request.headers.get_ref(CONNECTION) == Close`. Well, it's not: it's
-/// actually a linear value, `Vec<Connection>` instead of `Connection`, so you'll actually be
-/// wanting to check something more like `request.headers.get_ref(CONNECTION).map(|c|
-/// c.contains(&Close)) == Some(true)`. Yes, this is more cumbersome than what you might write in
-/// another language, such as `request.headers["Connection"] == "close"`, but it's actually correct,
-/// whereas the one people would often write is very definitely incorrect.
+/// semantically typed values, not just sequences of characters. This may lead to some surprises
+/// among people who haven’t encountered such an attitude. Here are a couple of the simplest
+/// examples: the `Content-Length` header is a `usize` and the `Allow` header is a `Vec<Method>`.
+/// These aren’t particularly surprising. But some will be more surprising; you might think that
+/// the `Connection` header is a scalar, having seen it with the value `close` most frequently when
+/// present; therefore you might expect to check something like `request.headers.get(CONNECTION) ==
+/// Some(&Connection::Close)`. Well, it’s not: it’s actually a linear value, thus `Vec<Connection>`
+/// instead of `Connection`, so you’ll actually be wanting to check something more like
+/// `request.headers.get(CONNECTION).contains(&Close)`. Yes, this is a tiny bit more cumbersome
+/// than what you might write in another language, such as `request.headers["Connection"] ==
+/// "close"`, but it’s actually *correct*, whereas the one people would often write is very
+/// definitely incorrect and will break as soon as someone tries adding another token to the list.
+/// On headers like Connection it’s unlikely to ever be noticed, but for other headers such
+/// problems will be more obvious.
 ///
-/// There are four methods for this:
+/// Long live the strongly typed headers. Stringly typed headers, die! Headers are not strings.
+/// That is merely their wire form.
 ///
-/// - `get`: cloned value, if it exists.
-/// - `get_ref`: reference to the value, if it exists.
-/// - `get_mut_ref`: mutable reference to the value, if it exists.
+/// OK, enough rant.
+///
+/// Teepee supports two types of headers: **single-type** and **list-type** headers<sup>†</sup>.
+/// Single-type headers occur at most once in an HTTP message;.
+/// List-type headers may occur any number of types in an HTTP message; each line can continue
+/// multiple, comma-separated instances.
+///
+/// These are two 
+/// There are three primary methods for this:
+///
+/// - `get`: reference to the value, if it exists.
+/// - `get_mut`: mutable reference to the value, if it exists.
 /// - `set`: assign the value.
 ///
 /// One thing out of the ordinary to be aware of is that all of these methods take `&mut self`, even
@@ -288,6 +360,18 @@ impl Header for &'static Header {
 /// references to more than one header at once; where possible, use `get_ref`, but it is
 /// acknowledged that it will not always be feasible to use it: this is why `get` exists, which
 /// clones the value, thus releasing the lock on the header collection.
+///
+/// For cases that do not conform to the rules of HTTP (such as `Set-Cookie`), and for cases where
+/// headers must be accessed without semantic knowledge (such as a proxy, passing the values on to
+/// something else), there is also raw header access in the `_raw` methods. There is little novelty
+/// about them, so they don’t need further clarification here.
+///
+/// Aside: back on the topic of that eldritch monstrosity `Set-Cookie`, which doesn’t support
+/// comma-separating multiple values but requires each value to be a separate header. It could
+/// have been special cased in the handling of list-type headers, but that would be rather nasty;
+/// raw access satisfies the requirements satisfactorily, especially when you take into account
+/// that one shouldn’t tend to work directly with the cookie headers, but should instead use a
+/// cookie jar.
 ///
 /// Raw header access
 /// `````````````````
@@ -379,26 +463,25 @@ impl Headers {
     /// Get a reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get<'a, M: Marker<'a>>(&'a self, marker: M) -> M::Get {
-        internals::Get::get(self.data.get(&marker.header_name()))
+    pub fn get<'a, M: Marker<'a>>(&'a self, _marker: M) -> M::Get {
+        internals::Get::get(self.data.get(M::header_name()))
     }
 
     /// Get a mutable reference to a header value.
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
-    pub fn get_mut<'a, M: Marker<'a>>(&'a mut self, marker: M) -> M::GetMut {
-        internals::GetMut::get_mut(self.data.entry(marker.header_name()))
+    pub fn get_mut<'a, M: Marker<'a>>(&'a mut self, _marker: M) -> M::GetMut {
+        internals::GetMut::get_mut(self.data.entry(M::header_name().into()))
     }
 
     /// Set the named header to the given value.
-    // TODO: sans `where M::Set: Any` I get an ICE. I haven’t reported it yet, but I bet someone else has.
-    pub fn set<M: Marker<'static>>(&mut self, marker: M, value: M::Set) where M::Set: Any {
+    pub fn set<M: Marker<'static>>(&mut self, _marker: M, value: M::Set) {
         // Houston, we have a minor problem here. Unlike Get and GetMut which were unambiguous,
         // here we have for single headers an impl for T and for list headers one for Vec<T>.
-        // We’d like to do `internals::Set::set(self.data.entry(marker.header_name()), value)`,
+        // We’d like to do `internals::Set::set(self.data.entry(M::header_name().into()), value)`,
         // but this wouldn’t work because of the conflicting Set implementations.
         // So what do we do? We cheat! Yay for cheating!
-        let entry = self.data.entry(marker.header_name());
+        let entry = self.data.entry(M::header_name().into());
         if TypeId::of::<Vec<M::Base>>() == TypeId::of::<M::Set>() {
             // It’s a list header.
             // And now we want to transmute it, but we can’t do that so simply because of generics
@@ -428,8 +511,8 @@ impl Headers {
     ///
     /// The returned value is a slice of each header field value.
     #[inline]
-    pub fn get_raw<'a, M: Marker<'a>>(&'a self, header_marker: M) -> Option<RawRef> {
-        self.data.get(&header_marker.header_name()).and_then(|item| item.raw())
+    pub fn get_raw<'a, M: Marker<'a>>(&'a self, _marker: M) -> Option<RawRef> {
+        self.data.get(M::header_name()).and_then(|item| item.raw())
     }
 
     /// Get a mutable reference to the raw values of a header, by name.
@@ -437,17 +520,17 @@ impl Headers {
     /// The returned vector contains each header field value.
     #[inline]
     pub fn get_raw_mut<'a, M: Marker<'a>>
-                      (&'a mut self, header_marker: M)
+                      (&'a mut self, _marker: M)
                       -> Option<&mut Vec<Vec<u8>>> {
-        self.data.get_mut(&header_marker.header_name()).map(|item| item.raw_mut())
+        self.data.get_mut(M::header_name()).map(|item| item.raw_mut())
     }
 
     /// Set the raw value of a header, by name.
     ///
     /// This invalidates the typed representation.
     #[inline]
-    pub fn set_raw<'a, M: Marker<'a>>(&'a mut self, header_marker: M, value: Vec<Vec<u8>>) {
-        match self.data.entry(header_marker.header_name()) {
+    pub fn set_raw<'a, M: Marker<'a>>(&'a mut self, _marker: M, value: Vec<Vec<u8>>) {
+        match self.data.entry(M::header_name().into()) {
             Vacant(entry) => { let _ = entry.insert(Item::from_raw(value)); },
             Occupied(entry) => entry.into_mut().set_raw(value),
         }
@@ -455,13 +538,13 @@ impl Headers {
 
     /// Remove a header from the collection.
     /// Returns true if the named header was present.
-    pub fn remove<'a, M: Marker<'a>>(&'a mut self, header_marker: &M) -> bool {
-        self.data.remove(&header_marker.header_name()).is_some()
+    pub fn remove<'a, M: Marker<'a>>(&'a mut self, _marker: M) -> bool {
+        self.data.remove(M::header_name()).is_some()
     }
 
     /// Returns true if the named header exists in the collection.
-    pub fn contains<'a, M: Marker<'a>>(&'a self, header_marker: &M) -> bool {
-        match self.data.get(&header_marker.header_name()) {
+    pub fn contains<'a, M: Marker<'a>>(&'a self, _marker: M) -> bool {
+        match self.data.get(M::header_name()) {
             Some(item) => item.is_valid(),
             None => false,
         }
