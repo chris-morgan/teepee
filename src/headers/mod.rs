@@ -10,7 +10,8 @@ use std::collections::hash_map::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 
 use self::internals::Item;
-pub use self::internals::{TypedRef, TypedListRef, RawRef};
+pub use mucell::Ref;
+pub use self::internals::TypedListRef;
 
 mod internals;
 mod implementations;
@@ -225,7 +226,7 @@ macro_rules! define_single_header_marker {
 
         impl<'a> $crate::headers::Marker<'a> for $marker {
             type Base = $ty;
-            type Get = Option<$crate::headers::TypedRef<'a, $ty>>;
+            type Get = Option<$crate::headers::Ref<'a, $ty>>;
             type GetMut = Option<&'a mut $ty>;
             type Set = $ty;
 
@@ -511,7 +512,7 @@ impl Headers {
     ///
     /// The returned value is a slice of each header field value.
     #[inline]
-    pub fn get_raw<'a, M: Marker<'a>>(&'a self, _marker: M) -> Option<RawRef> {
+    pub fn get_raw<'a, M: Marker<'a>>(&'a self, _marker: M) -> Option<Ref<Cow<[Vec<u8>]>>> {
         self.data.get(M::header_name()).and_then(|item| item.raw())
     }
 

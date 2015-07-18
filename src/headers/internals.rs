@@ -497,124 +497,21 @@ impl Inner {
             _ => Cow::Owned(vec![]),
         }
     }
-
 }
 
-/// An immutable reference to a `MuCell`. Dereference to get at the object.
-pub struct RawRef<'a> {
-    _parent: Ref<'a, Inner>,
-    _data: Cow<'a, [Vec<u8>]>,
-}
-
-impl<'a> RawRef<'a> {
-    /// Construct a reference from the cell.
-    #[allow(trivial_casts)]  // The `as *const $ty` cast
-    fn from(cell: &'a MuCell<Inner>) -> Option<RawRef<'a>> {
-        let parent = cell.borrow();
-        let x: &'a Inner = unsafe { &*(&*parent as *const Inner) };
-        match x.raw_cow() {
-            Some(data) => Some(RawRef {
-                _parent: parent,
-                _data: data,
-            }),
-            None => None,
-        }
-    }
-}
-
-impl<'a> Deref for RawRef<'a> {
-    type Target = [Vec<u8>];
-    fn deref(&self) -> &[Vec<u8>] {
-        &*self._data
-    }
-}
-
-impl<'a> RawRef<'a> {
-    /// Extract the owned data.
-    ///
-    /// Copies the data if it is not already owned.
-    pub fn into_owned(self) -> Vec<Vec<u8>> {
-        self._data.into_owned()
-    }
-}
-
-//mucell_ref_type! {
-//    //#[doc = "TODO"]
-//    struct TypedRef<'a, T: 'static>(Inner),
-//    impl Deref -> T,
-//    data: Cow<'a, T> = |x| x.typed_cow()
-//}
-
-/// An immutable reference to a `MuCell`. Dereference to get at the object.
-//$(#[$attr])*
-pub struct TypedRef<'a, H: ToHeader + Header + Clone> {
-    _parent: Ref<'a, Inner>,
-    _data: Cow<'a, H>,
-}
-
-impl<'a, H: ToHeader + Header + Clone> TypedRef<'a, H> {
-    /// Construct a reference from the cell.
-    #[allow(trivial_casts)]  // The `as *const $ty` cast
-    fn from(cell: &'a MuCell<Inner>, convert_if_necessary: bool) -> Option<TypedRef<'a, H>> {
-        let parent = cell.borrow();
-        let inner: &'a Inner = unsafe { &*(&*parent as *const Inner) };
-        match inner.single_typed_cow(convert_if_necessary) {
-            Some(data) => Some(TypedRef {
-                _parent: parent,
-                _data: data,
-            }),
-            None => None,
-        }
-    }
-}
-
-impl<'a, H: ToHeader + Header + Clone> Deref for TypedRef<'a, H> {
-    type Target = H;
-    fn deref<'b>(&'b self) -> &'b H {
-        &*self._data
-    }
-}
-
-impl<'a, H: ToHeader + Header + Clone> TypedRef<'a, H> {
-    /// Extract the owned data.
-    ///
-    /// Copies the data if it is not already owned.
-    pub fn into_owned(self) -> H {
-        self._data.into_owned()
-    }
-}
-
-/// An immutable reference to a `MuCell`. Dereference to get at the object.
-//$(#[$attr])*
+/// An immutable reference to a typed header list. Dereference to get at the slice.
 pub struct TypedListRef<'a, H: ToHeader + Header + Clone> {
-    _parent: Option<Ref<'a, Inner>>,
-    _data: Cow<'a, [H]>,
-}
-
-impl<'a, H: ToHeader + Header + Clone> TypedListRef<'a, H> {
-    /// Construct a reference from the cell.
-    #[allow(trivial_casts)]  // The `as *const $ty` cast
-    fn from(cell: &'a MuCell<Inner>, convert_if_necessary: bool) -> TypedListRef<'a, H> {
-        let parent = cell.borrow();
-        let inner: &'a Inner = unsafe { &*(&*parent as *const Inner) };
-        TypedListRef {
-            _parent: Some(parent),
-            _data: inner.list_typed_cow(convert_if_necessary),
-        }
-    }
-
-    fn empty() -> TypedListRef<'a, H> {
-        TypedListRef {
-            _parent: None,
-            _data: Cow::Borrowed(&[]),
-        }
-    }
+    value: Option<Ref<'a, Cow<'a, [H]>>>,
 }
 
 impl<'a, H: ToHeader + Header + Clone> Deref for TypedListRef<'a, H> {
     type Target = [H];
-    fn deref<'b>(&'b self) -> &'b [H] {
-        &*self._data
+
+    fn deref(&self) -> &[H] {
+        match self.value {
+            Some(ref r) => &r,
+            None => &[],
+        }
     }
 }
 
@@ -623,7 +520,10 @@ impl<'a, H: ToHeader + Header + Clone> TypedListRef<'a, H> {
     ///
     /// Copies the data if it is not already owned.
     pub fn into_owned(self) -> Vec<H> {
-        self._data.into_owned()
+        match self.value {
+            Some(r) => r.into_owned(),
+            None => vec![],
+        }
     }
 }
 
@@ -697,9 +597,9 @@ impl Item {
     /// dereference to get your raw reference.
     ///
     /// See also `raw_mut`, if you wish to mutate the raw representation.
-    pub fn raw(&self) -> Option<RawRef> {
+    pub fn raw(&self) -> Option<Ref<Cow<[Vec<u8>]>>> {
         self.inner.try_mutate(|inner| { let _ = inner.raw_mut(false); });
-        RawRef::from(&self.inner)
+        Ref::filter_map(self.inner.borrow(), |inner| inner.raw_cow())
     }
 
     /// Set the raw form of the header.
@@ -746,11 +646,11 @@ impl Item {
     /// can dereference to get your typed reference.
     ///
     /// See also `single_typed_mut`, if you wish to mutate the single-typed representation.
-    pub fn single_typed<H: ToHeader + Header + Clone>(&self) -> Option<TypedRef<H>> {
+    pub fn single_typed<H: ToHeader + Header + Clone>(&self) -> Option<Ref<Cow<H>>> {
         let convert_if_necessary = self.inner.try_mutate(|inner| {
             let _ = inner.single_typed_mut::<H>(false);
         });
-        TypedRef::from(&self.inner, convert_if_necessary)
+        Ref::filter_map(self.inner.borrow(), |inner| inner.single_typed_cow(convert_if_necessary))
     }
 
     /// Get a reference to the list-typed representation of the header values.
@@ -763,11 +663,11 @@ impl Item {
     /// can dereference to get your typed reference.
     ///
     /// See also `list_typed_mut`, if you wish to mutate the list-typed representation.
-    pub fn list_typed<H: ToHeader + Header + Clone>(&self) -> TypedListRef<H> {
+    pub fn list_typed<H: ToHeader + Header + Clone>(&self) -> Ref<Cow<[H]>> {
         let convert_if_necessary = self.inner.try_mutate(|inner| {
             let _ = inner.list_typed_mut::<H>(false);
         });
-        TypedListRef::from(&self.inner, convert_if_necessary)
+        Ref::map(self.inner.borrow(), |inner| inner.list_typed_cow(convert_if_necessary))
     }
 
     /// Set the typed form of the header as a single-type.
@@ -794,7 +694,7 @@ pub trait Get<'a> {
     fn get(item: Option<&'a Item>) -> Self;
 }
 
-impl<'a, T: ToHeader + Header + Clone> Get<'a> for Option<TypedRef<'a, T>> {
+impl<'a, T: ToHeader + Header + Clone> Get<'a> for Option<Ref<'a, Cow<'a, T>>> {
     fn get(item: Option<&'a Item>) -> Self {
         // TODO: consider shifting that method into here, if appropriate; ditto for all the rest
         item.and_then(|item| item.single_typed())
@@ -803,9 +703,8 @@ impl<'a, T: ToHeader + Header + Clone> Get<'a> for Option<TypedRef<'a, T>> {
 
 impl<'a, T: ToHeader + Header + Clone> Get<'a> for TypedListRef<'a, T> {
     fn get(item: Option<&'a Item>) -> Self {
-        match item {
-            Some(item) => item.list_typed(),
-            None => TypedListRef::empty(),
+        TypedListRef {
+            value: item.map(|item| item.list_typed()),
         }
     }
 }
