@@ -226,7 +226,7 @@ macro_rules! define_single_header_marker {
 
         impl<'a> $crate::headers::Marker<'a> for $marker {
             type Base = $ty;
-            type Get = Option<$crate::headers::Ref<'a, $ty>>;
+            type Get = Option<$crate::headers::Ref<'a, ::std::borrow::Cow<'a, $ty>>>;
             type GetMut = Option<&'a mut $ty>;
             type Set = $ty;
 
