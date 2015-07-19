@@ -15,3 +15,5 @@ mucell = "0.3.2"
 phf = "*"
 phf_macros = "*"
 mopa = "*"
+tendril = {version = "*", git = "https://github.com/chris-morgan/tendril", branch = "impl-borrow-for-tendril"}
+smallvec = "*"

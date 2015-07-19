@@ -9,6 +9,9 @@ use std::mem;
 use std::collections::hash_map::HashMap;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 
+use tendril::{ByteTendril, StrTendril};
+use smallvec::SmallVec;
+
 use self::internals::Item;
 pub use mucell::Ref;
 pub use self::internals::TypedListRef;
@@ -56,8 +59,13 @@ pub trait Header: Any + HeaderClone {
     /// present that there may be cases where there is a better choice. It might be shifted out of
     /// the trait later.
     // unstable: might be removed from the trait
-    fn to_raw(&self) -> Vec<u8> {
-        format!("{}", HeaderDisplayAdapter(&*self)).into_bytes()
+    fn to_raw(&self) -> ByteTendril {
+        use std::io::Write;
+
+        let mut out = ByteTendril::new();
+        // Meh, nothing is allowed to go wrong here.
+        let _ = write!(out, "{}", HeaderDisplayAdapter(&*self));
+        out
     }
 
     /// Convert the header to its raw value, consuming self.
@@ -70,7 +78,7 @@ pub trait Header: Any + HeaderClone {
     /// present that there may be cases where there is a better choice. It might be shifted out of
     /// the trait later.
     // unstable: might be removed from the trait
-    fn into_raw(self: Box<Self>) -> Vec<u8> {
+    fn into_raw(self: Box<Self>) -> ByteTendril {
         self.to_raw()
     }
 }
@@ -450,7 +458,7 @@ impl Header for &'static Header {
 /// item.
 #[derive(PartialEq)]
 pub struct Headers {
-    data: HashMap<Cow<'static, str>, Item>,
+    data: HashMap<StrTendril, Item>,
 }
 
 impl Headers {
@@ -465,7 +473,7 @@ impl Headers {
     ///
     /// The interface is strongly typed; see TODO for a more detailed explanation of how it works.
     pub fn get<'a, M: Marker<'a>>(&'a self, _marker: M) -> M::Get {
-        internals::Get::get(self.data.get(M::header_name()))
+        internals::Get::get(self.data.get(M::header_name().as_bytes()))
     }
 
     /// Get a mutable reference to a header value.
@@ -512,8 +520,8 @@ impl Headers {
     ///
     /// The returned value is a slice of each header field value.
     #[inline]
-    pub fn get_raw<'a, M: Marker<'a>>(&'a self, _marker: M) -> Option<Ref<Cow<[Vec<u8>]>>> {
-        self.data.get(M::header_name()).and_then(|item| item.raw())
+    pub fn get_raw<'a, M: Marker<'a>>(&'a self, _marker: M) -> Option<Ref<Cow<[ByteTendril]>>> {
+        self.data.get(M::header_name().as_bytes()).and_then(|item| item.raw())
     }
 
     /// Get a mutable reference to the raw values of a header, by name.
@@ -522,15 +530,15 @@ impl Headers {
     #[inline]
     pub fn get_raw_mut<'a, M: Marker<'a>>
                       (&'a mut self, _marker: M)
-                      -> Option<&mut Vec<Vec<u8>>> {
-        self.data.get_mut(M::header_name()).map(|item| item.raw_mut())
+                      -> Option<&mut SmallVec<[ByteTendril; 1]>> {
+        self.data.get_mut(M::header_name().as_bytes()).map(|item| item.raw_mut())
     }
 
     /// Set the raw value of a header, by name.
     ///
     /// This invalidates the typed representation.
     #[inline]
-    pub fn set_raw<'a, M: Marker<'a>>(&'a mut self, _marker: M, value: Vec<Vec<u8>>) {
+    pub fn set_raw<'a, M: Marker<'a>>(&'a mut self, _marker: M, value: SmallVec<[ByteTendril; 1]>) {
         match self.data.entry(M::header_name().into()) {
             Vacant(entry) => { let _ = entry.insert(Item::from_raw(value)); },
             Occupied(entry) => entry.into_mut().set_raw(value),
@@ -540,12 +548,12 @@ impl Headers {
     /// Remove a header from the collection.
     /// Returns true if the named header was present.
     pub fn remove<'a, M: Marker<'a>>(&'a mut self, _marker: M) -> bool {
-        self.data.remove(M::header_name()).is_some()
+        self.data.remove(M::header_name().as_bytes()).is_some()
     }
 
     /// Returns true if the named header exists in the collection.
     pub fn contains<'a, M: Marker<'a>>(&'a self, _marker: M) -> bool {
-        match self.data.get(M::header_name()) {
+        match self.data.get(M::header_name().as_bytes()) {
             Some(item) => item.is_valid(),
             None => false,
         }

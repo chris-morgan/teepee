@@ -17,6 +17,9 @@ extern crate mucell;
 #[macro_use]
 extern crate mopa;
 
+extern crate tendril;
+extern crate smallvec;
+
 pub mod method;
 pub mod status;
 pub mod headers;

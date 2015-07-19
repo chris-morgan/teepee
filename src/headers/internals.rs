@@ -7,9 +7,23 @@ use std::fmt;
 use std::mem;
 use std::slice;
 
+use tendril::{ByteTendril, StrTendril};
+use smallvec::SmallVec;
+
 use mucell::{MuCell, Ref};
 
 use super::{ToHeader, Header, HeaderDisplayAdapter};
+
+// Nothing even remotely fancy here like counting how many items,
+// because I don’t need it in my simple cases.
+macro_rules! smallvec {
+    [] => (SmallVec::new());
+    [$($x:expr),*] => {{
+        let mut _small_vec = SmallVec::new();
+        $(_small_vec.push($x);)*
+        _small_vec
+    }};
+}
 
 /// All the header field values, raw or typed, with a shared field name.
 ///
@@ -49,7 +63,7 @@ struct Inner {
     /// which were equivalent. Each inner vector is opaque data with no restrictions except that CR
     /// and LF may not appear, unless as part of an obs-fold rule (extremely much not recommended),
     /// though it is also recommended by RFC 7230 that it be US-ASCII.
-    raw: Option<Vec<Vec<u8>>>,
+    raw: Option<SmallVec<[ByteTendril; 1]>>,
 
     /// A strongly typed header which has been parsed from the raw value.
     typed: Typed,
@@ -176,7 +190,7 @@ impl<T: Iterator> MyIteratorExt for T {
 
 struct ValueListIter<'a> {
     current_line: Option<&'a [u8]>,
-    lines: slice::Iter<'a, Vec<u8>>,
+    lines: slice::Iter<'a, ByteTendril>,
 }
 
 macro_rules! DEBUG { ($($x:tt)*) => (println!($($x)*)) }
@@ -317,7 +331,7 @@ trait RawHeaderExt {
     fn to_value_list_iter(&self) -> ValueListIter;
 }
 
-impl RawHeaderExt for [Vec<u8>] {
+impl RawHeaderExt for [ByteTendril] {
     fn to_value_list_iter(&self) -> ValueListIter {
         ValueListIter {
             current_line: None,
@@ -331,11 +345,13 @@ macro_rules! value_list_iter_tests {
         #[cfg(test)]
         mod value_list_iter_tests {
             use super::RawHeaderExt;
+            use tendril::ByteTendril;
             $(
                 #[test]
                 fn $name() {
                     let input: &[&[u8]] = &$input;
-                    let input = input.iter().map(|x| x.to_vec()).collect::<Vec<_>>();
+                    let input = input.iter().map(|&x| ByteTendril::from(x))
+                                            .collect::<Vec<ByteTendril>>();
                     let expected: &[&[u8]] = &$expected;
                     let computed = input.to_value_list_iter().collect::<Vec<_>>();
                     assert_eq!(&computed[..], expected);
@@ -365,19 +381,19 @@ value_list_iter_tests! {
 }
 
 impl Inner {
-    fn raw_mut(&mut self, invalidate_others: bool) -> &mut Vec<Vec<u8>> {
+    fn raw_mut(&mut self, invalidate_others: bool) -> &mut SmallVec<[ByteTendril; 1]> {
         if self.raw.is_none() {
             self.raw = Some(if invalidate_others {
                 match mem::replace(&mut self.typed, Typed::None) {
-                    Typed::None => vec![],
-                    Typed::Single(single) => vec![single.into_raw()],
-                    Typed::List(list) => vec![list.to_raw()],
+                    Typed::None => smallvec![],
+                    Typed::Single(single) => smallvec![single.into_raw()],
+                    Typed::List(list) => smallvec![list.to_raw()],
                 }
             } else {
                 match self.typed {
-                    Typed::None => vec![],
-                    Typed::Single(ref single) => vec![single.to_raw()],
-                    Typed::List(ref list) => vec![list.to_raw()],
+                    Typed::None => smallvec![],
+                    Typed::Single(ref single) => smallvec![single.to_raw()],
+                    Typed::List(ref list) => smallvec![list.to_raw()],
                 }
             });
         }
@@ -388,7 +404,7 @@ impl Inner {
     }
 
     // Moo!
-    fn raw_cow(&self) -> Option<Cow<[Vec<u8>]>> {
+    fn raw_cow(&self) -> Option<Cow<[ByteTendril]>> {
         match self.raw {
             Some(ref vec) => Some(Cow::Borrowed(&vec[..])),
             None => match self.typed {
@@ -531,7 +547,7 @@ impl<'a, H: ToHeader + Header + Clone> TypedListRef<'a, H> {
 
 impl Item {
     /// Construct a new Item from a raw representation.
-    pub fn from_raw(raw: Vec<Vec<u8>>) -> Item {
+    pub fn from_raw(raw: SmallVec<[ByteTendril; 1]>) -> Item {
         assert!(raw.len() > 0);
         Item {
             inner: MuCell::new(Inner {
@@ -583,7 +599,7 @@ impl Item {
     /// fashion, it will be parsed from the raw form.
     ///
     /// Only use this if you need to mutate the raw form; if you don't, use `raw`.
-    pub fn raw_mut(&mut self) -> &mut Vec<Vec<u8>> {
+    pub fn raw_mut(&mut self) -> &mut SmallVec<[ByteTendril; 1]> {
         self.inner.borrow_mut().raw_mut(true)
     }
 
@@ -597,7 +613,7 @@ impl Item {
     /// dereference to get your raw reference.
     ///
     /// See also `raw_mut`, if you wish to mutate the raw representation.
-    pub fn raw(&self) -> Option<Ref<Cow<[Vec<u8>]>>> {
+    pub fn raw(&self) -> Option<Ref<Cow<[ByteTendril]>>> {
         self.inner.try_mutate(|inner| { let _ = inner.raw_mut(false); });
         Ref::filter_map(self.inner.borrow(), |inner| inner.raw_cow())
     }
@@ -605,7 +621,7 @@ impl Item {
     /// Set the raw form of the header.
     ///
     /// This invalidates the typed representation.
-    pub fn set_raw(&mut self, raw: Vec<Vec<u8>>) {
+    pub fn set_raw(&mut self, raw: SmallVec<[ByteTendril; 1]>) {
         let inner = self.inner.borrow_mut();
         inner.raw = Some(raw);
         inner.typed = Typed::None;
@@ -711,11 +727,11 @@ impl<'a, T: ToHeader + Header + Clone> Get<'a> for TypedListRef<'a, T> {
 
 #[doc(hidden)]
 pub trait GetMut<'a> {
-    fn get_mut(entry: hash_map::Entry<'a, Cow<'static, str>, Item>) -> Self;
+    fn get_mut(entry: hash_map::Entry<'a, StrTendril, Item>) -> Self;
 }
 
 impl<'a, T: ToHeader + Header + Clone> GetMut<'a> for Option<&'a mut T> {
-    fn get_mut(entry: hash_map::Entry<'a, Cow<'static, str>, Item>) -> Self {
+    fn get_mut(entry: hash_map::Entry<'a, StrTendril, Item>) -> Self {
         match entry {
             hash_map::Entry::Occupied(entry) => entry.into_mut().single_typed_mut(),
             hash_map::Entry::Vacant(_) => None,
@@ -724,7 +740,7 @@ impl<'a, T: ToHeader + Header + Clone> GetMut<'a> for Option<&'a mut T> {
 }
 
 impl<'a, T: ToHeader + Header + Clone> GetMut<'a> for &'a mut Vec<T> {
-    fn get_mut(entry: hash_map::Entry<'a, Cow<'static, str>, Item>) -> Self {
+    fn get_mut(entry: hash_map::Entry<'a, StrTendril, Item>) -> Self {
         entry.or_insert_with(|| Item::from_list_typed::<T>(vec![])).list_typed_mut()
     }
 }
