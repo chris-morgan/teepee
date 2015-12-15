@@ -715,8 +715,9 @@ pub enum StatusCode {
     Code419 = 419,
     /// 420 (unregistered)
     Code420 = 420,
-    /// 421 (unregistered)
-    Code421 = 421,
+    /// 421 Misdirected Request
+    /// [[RFC7540, Section 9.1.2](https://tools.ietf.org/html/rfc7540#section-9.1.2)]
+    MisdirectedRequest = 421,
     /// 422 Unprocessable Entity
     /// [[RFC4918](https://tools.ietf.org/html/rfc4918)]
     UnprocessableEntity = 422,
@@ -1434,7 +1435,7 @@ impl StatusCode {
             ImATeapot => Some("I'm a teapot"),
             Code419 => None,
             Code420 => None,
-            Code421 => None,
+            MisdirectedRequest => Some("Misdirected Request"),
             UnprocessableEntity => Some("Unprocessable Entity"),
             Locked => Some("Locked"),
             FailedDependency => Some("Failed Dependency"),
@@ -1988,7 +1989,7 @@ impl fmt::Debug for StatusCode {
             ImATeapot => "ImATeapot",
             Code419 => "Code419",
             Code420 => "Code420",
-            Code421 => "Code421",
+            MisdirectedRequest => "MisdirectedRequest",
             UnprocessableEntity => "UnprocessableEntity",
             Locked => "Locked",
             FailedDependency => "FailedDependency",

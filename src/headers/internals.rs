@@ -666,7 +666,7 @@ impl Item {
         let convert_if_necessary = self.inner.try_mutate(|inner| {
             let _ = inner.single_typed_mut::<H>(false);
         });
-        Ref::filter_map(self.inner.borrow(), |inner| inner.single_typed_cow(convert_if_necessary))
+        Ref::filter_map(self.inner.borrow(), move |inner| inner.single_typed_cow(convert_if_necessary))
     }
 
     /// Get a reference to the list-typed representation of the header values.
@@ -683,7 +683,7 @@ impl Item {
         let convert_if_necessary = self.inner.try_mutate(|inner| {
             let _ = inner.list_typed_mut::<H>(false);
         });
-        Ref::map(self.inner.borrow(), |inner| inner.list_typed_cow(convert_if_necessary))
+        Ref::map(self.inner.borrow(), move |inner| inner.list_typed_cow(convert_if_necessary))
     }
 
     /// Set the typed form of the header as a single-type.

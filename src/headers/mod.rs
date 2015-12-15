@@ -20,7 +20,7 @@ mod internals;
 mod implementations;
 
 /// A trait defining the parsing of a header from a raw value.
-pub trait ToHeader {
+pub trait ToHeader: Sized {
     /// Parse a header from a header field value, returning some value if successful or `None` if
     /// parsing fails.
     ///
